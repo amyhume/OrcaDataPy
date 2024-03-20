@@ -1,7 +1,4 @@
 from setuptools import setup, find_packages
-import requests
-import pandas as pd
-import io
 
 setup(
    name='OrcaDataPy',

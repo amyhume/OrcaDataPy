@@ -15,6 +15,9 @@ def get_orca_data(token, form, raw_v_label = 'raw', form_complete = True):
     Returns:
         pandas.DataFrame: A DataFrame with the retrieved data.
     """
+    import requests
+    import pandas as pd
+    import io
    
     if form_complete:
         record_filter = f"[{form}_complete]=2"
@@ -64,7 +67,10 @@ def get_orca_field(token, field, raw_v_label = 'raw'):
 
     Returns:
         pandas.DataFrame: A DataFrame with the retrieved record id, redcap event name and field.
-    """  
+    """
+    import requests
+    import pandas as pd
+    import io
 
     #!/usr/bin/env python
     data = {
