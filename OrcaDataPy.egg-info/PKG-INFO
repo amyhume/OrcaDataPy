@@ -1,0 +1,8 @@
+Metadata-Version: 2.1
+Name: OrcaDataPy
+Version: 0.1
+Summary: Pulls REDCap data into python using api
+Home-page: https://github.com/amyhume/OrcaDataPy
+Author: Amy Hume
+Author-email: amh9785@nyu.edu
+Requires-Python: >=3.6

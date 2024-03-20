@@ -1,0 +1,7 @@
+setup.py
+OrcaDataPy.egg-info/PKG-INFO
+OrcaDataPy.egg-info/SOURCES.txt
+OrcaDataPy.egg-info/dependency_links.txt
+OrcaDataPy.egg-info/top_level.txt
+orca/__init__.py
+orca/get_orca_data.py
