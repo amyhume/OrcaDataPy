@@ -43,7 +43,6 @@ def get_orca_data(token, form, raw_v_label = 'raw', form_complete = True):
     }
     r = requests.post(url,data=data)
     print('HTTP Status: ' + str(r.status_code))
-    print(r.text)
 
     df = pd.read_csv(io.StringIO(r.text))
     df = df[~df['record_id'].str.contains('TEST')]
@@ -91,7 +90,7 @@ def get_orca_field(token, field, raw_v_label = 'raw'):
     }
     r = requests.post('https://redcap.nyu.edu/api/',data=data)
     print('HTTP Status: ' + str(r.status_code))
-    print(r.text)
+    
     df = pd.read_csv(io.StringIO(r.text))
     df = df[~df['record_id'].str.contains('TEST')]
     df = df[df[field].notna()]
