@@ -15,9 +15,6 @@ def get_orca_data(token, form, raw_v_label = 'raw', form_complete = True):
     Returns:
         pandas.DataFrame: A DataFrame with the retrieved data.
     """
-    import requests
-    import pandas as pd
-    import io   
    
     if form_complete:
         record_filter = f"[{form}_complete]=2"
@@ -46,6 +43,7 @@ def get_orca_data(token, form, raw_v_label = 'raw', form_complete = True):
     print(r.text)
 
     df = pd.read_csv(io.StringIO(r.text))
+    df = df[~df['record_id'].str.contains('TEST')]
 
     if form_complete:
         record_filter = f"{form}_complete"
@@ -53,3 +51,44 @@ def get_orca_data(token, form, raw_v_label = 'raw', form_complete = True):
         return filtered_df
     else:
         return df
+    
+
+def get_orca_field(token, field, raw_v_label = 'raw'):
+    """
+    Retrieve any ORCA field from a REDCap project using the API.
+
+    Args:
+        token (str): The API token for the project.
+        field (str): The name of the REDCap field to retrieve data from.
+        raw_v_label (str): The label for raw data fields (default is 'raw').
+
+    Returns:
+        pandas.DataFrame: A DataFrame with the retrieved record id, redcap event name and field.
+    """  
+
+    #!/usr/bin/env python
+    data = {
+        'token': token,
+        'content': 'record',
+        'action': 'export',
+        'format': 'csv',
+        'type': 'flat',
+        'csvDelimiter': '',
+        'fields[0]': 'record_id',
+        'fields[1]': field,
+        'rawOrLabel': 'raw',
+        'rawOrLabelHeaders': 'raw',
+        'exportCheckboxLabel': 'false',
+        'exportSurveyFields': 'false',
+        'exportDataAccessGroups': 'false',
+        'returnFormat': 'json'
+    }
+    r = requests.post('https://redcap.nyu.edu/api/',data=data)
+    print('HTTP Status: ' + str(r.status_code))
+    print(r.text)
+    df = pd.read_csv(io.StringIO(r.text))
+    df = df[~df['record_id'].str.contains('TEST')]
+    df = df[df[field].notna()]
+    return df
+   
+
