@@ -240,5 +240,35 @@ def get_task_info(token, record_id = None, transposed = False):
 
     return task_completion, task_data, task_timestamps
 
+def get_movesense_numbers(token, record_id = None):
+    """
+    Pulls child and caregiver movesense device numbers for 4 months.
+
+    Args:
+        token (str): The API token for the project.
+        record_id (str): the record id you wish to pull (e.g. '218'). Default is 'none' and will pull the whole dataset
+
+    Returns:
+        pandas.DataFrame: A DataFrame with record id, child device number and caregiver device number. If a single record id is specified, will return cg device number first, then child
+
+    """
+    visit_notes = get_orca_data(token, form = "visit_notes_4m", form_complete=False)
+
+    if record_id != None:
+        visit_notes = visit_notes[visit_notes['record_id'] == id]
+        visit_notes.reset_index(drop=True, inplace=True)
+        child_number = str(int(visit_notes['hr_device_child_4m']))
+        parent_number = str(int(visit_notes['hr_device_cg_4m']))
+        return parent_number, child_number
+    else:
+        visit_notes = visit_notes[['record_id', 'hr_device_cg_4m', 'hr_device_child_4m']]
+        visit_notes['hr_device_cg_4m'] = visit_notes['hr_device_cg_4m'].astype('Int64')
+        visit_notes['hr_device_child_4m'] = visit_notes['hr_device_child_4m'].astype('Int64')
+        return visit_notes
+
+    
+
+
+
 
 
