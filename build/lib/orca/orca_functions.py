@@ -219,7 +219,7 @@ def get_task_completion(token, record_id = None, transposed = False):
 def get_task_info(token, record_id = None, transposed = False):
     """
     Retrieves 3 data frames - task timestamps, completion status, and data presence for all ids or a particular id.
-    Returns in order of: task_completion, task_timestamps, task_data
+    Returns in order of: task_completion, task_data, task_timestamps
 
     Args:
         token (str): The API token for the project.
@@ -269,4 +269,64 @@ def get_movesense_numbers(token, record_id = None):
         visit_notes['hr_device_child_4m'] = visit_notes['hr_device_child_4m'].astype('Int64')
         return visit_notes
 
+
+def check_timestamps(token, record_id):
+    """
+    Pulls task info, and checks to see if there's any incorrectly missing timestamps.
+
+    Args:
+        token (str): The API token for the project.
+        record_id (str): the record id you wish to pull (e.g. '218')
+
+    Returns:
+        pandas.DataFrame: A character vector with the tasks that have incorrect/missing timestamps
+
+    """
+    import requests
+    import pandas as pd
+    import io
+    comp, data, timestamps = get_task_info(token, record_id=record_id, transposed=True)
+
+    missing_timestamps = []
+    #richards
+    if data.iloc[0,2] == 1 | data.iloc[1,2]:
+        if pd.isna(timestamps.iloc[0, 2]) or pd.isna(timestamps.iloc[1, 2]):
+            missing_timestamps.append('richards')
+    #vpc
+    if data.iloc[3,2] == 1 | data.iloc[4,2]:
+        if pd.isna(timestamps.iloc[2, 2]) or pd.isna(timestamps.iloc[3, 2]):
+            missing_timestamps.append('vpc')
+    #srt
+    if data.iloc[6,2] == 1 | data.iloc[7,2]:
+        if pd.isna(timestamps.iloc[4, 2]) or pd.isna(timestamps.iloc[5, 2]):
+            missing_timestamps.append('srt')
+    #cecile
+    if data.iloc[9,2] == 1 | data.iloc[10,2]:
+        if pd.isna(timestamps.iloc[6, 2]) or pd.isna(timestamps.iloc[7, 2]):
+            missing_timestamps.append('cecile')
+    #relational memory
+    if data.iloc[12,2] == 1 | data.iloc[13,2]:
+        if pd.isna(timestamps.iloc[8, 2]) or pd.isna(timestamps.iloc[9, 2]):
+            missing_timestamps.append('relational_memory')
     
+    #freeplay
+    visit_notes = get_orca_data(token, form = "visit_notes_4m", form_complete=False)
+    visit_notes = visit_notes[visit_notes['record_id'] == record_id]
+    visit_notes.reset_index(drop=True, inplace=True)
+    no_toy = visit_notes['freeplay_conditions_4m___1'].iloc[0]
+    toy = visit_notes['freeplay_conditions_4m___2'].iloc[0]
+
+    #freeplay
+    if data.iloc[15,2] == 1 | data.iloc[16,2]:
+        if no_toy == 1 and toy == 1:
+            if pd.isna(timestamps.iloc[10, 2]) or pd.isna(timestamps.iloc[11, 2]) or pd.isna(timestamps.iloc[12, 2]) or pd.isna(timestamps.iloc[13, 2]):
+                missing_timestamps.append('freeplay')
+        elif no_toy == 1 and toy != 1:
+            if pd.isna(timestamps.iloc[10, 2]) or pd.isna(timestamps.iloc[11, 2]):
+                missing_timestamps.append('notoy_freeplay')
+        elif no_toy != 1 and toy == 1:
+            if pd.isna(timestamps.iloc[12, 2]) or pd.isna(timestamps.iloc[13, 2]):
+                missing_timestamps.append('toy_freeplay')
+
+    return missing_timestamps
+                
