@@ -258,7 +258,7 @@ def get_movesense_numbers(token, record_id = None):
     visit_notes = get_orca_data(token, form = "visit_notes_4m", form_complete=False)
 
     if record_id != None:
-        visit_notes = visit_notes[visit_notes['record_id'] == id]
+        visit_notes = visit_notes[visit_notes['record_id'] == record_id]
         visit_notes.reset_index(drop=True, inplace=True)
         child_number = str(int(visit_notes['hr_device_child_4m']))
         parent_number = str(int(visit_notes['hr_device_cg_4m']))
@@ -270,6 +270,3 @@ def get_movesense_numbers(token, record_id = None):
         return visit_notes
 
     
-
-
-
