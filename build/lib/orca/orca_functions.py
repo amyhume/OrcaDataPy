@@ -252,6 +252,9 @@ def get_movesense_numbers(token, record_id = None):
         pandas.DataFrame: A DataFrame with record id, child device number and caregiver device number. If a single record id is specified, will return cg device number first, then child
 
     """
+    import requests
+    import pandas as pd
+    import io
     visit_notes = get_orca_data(token, form = "visit_notes_4m", form_complete=False)
 
     if record_id != None:
@@ -267,8 +270,6 @@ def get_movesense_numbers(token, record_id = None):
         return visit_notes
 
     
-
-
 
 
 
