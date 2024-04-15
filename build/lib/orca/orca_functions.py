@@ -329,4 +329,43 @@ def check_timestamps(token, record_id):
                 missing_timestamps.append('toy_freeplay')
 
     return missing_timestamps
-                
+
+
+
+def get_movesense_off_times(token, record_id):
+    """
+    Pulls test recording times for each movesense device in order parent, child.
+
+    Args:
+        token (str): The API token for the project.
+        record_id (str): the record id you wish to pull (e.g. '218')
+
+    Returns:
+        a character vector with the parent time followed by child time
+
+    """
+    import requests
+    import pandas as pd
+    import io
+    from datetime import datetime
+    parent_last_time = get_orca_field(token, field = "cg_movesense_test_time_4m")
+    child_last_time = get_orca_field(token, field = "child_movesense_test_time_4m")
+
+    parent_last_time = parent_last_time[parent_last_time['record_id'] == record_id]
+    child_last_time = child_last_time[child_last_time['record_id'] == record_id] 
+
+    date = get_orca_field(token, field = 'visit_date_4m')
+    date = date[date['record_id'] == record_id]
+    date = str(date['visit_date_4m'])
+    date = date.split()[1]
+
+
+    parent_last_time = str(parent_last_time['cg_movesense_test_time_4m'])
+    parent_last_time = parent_last_time.split()[1]
+    child_last_time = str(child_last_time['child_movesense_test_time_4m'])
+    child_last_time = child_last_time.split()[1]
+
+    parent_last_time = pd.to_datetime(date + ' ' + parent_last_time)
+    child_last_time = pd.to_datetime(date + ' ' + child_last_time)    
+
+    return parent_last_time, child_last_time
