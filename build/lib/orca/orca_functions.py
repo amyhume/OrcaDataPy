@@ -112,6 +112,7 @@ def get_task_timestamps(token, record_id = None, transposed = False):
     import requests
     import pandas as pd
     import io
+    import pytz
 
     visit_notes = get_orca_data(token, form = "visit_notes_4m", form_complete=False)
 
@@ -132,6 +133,8 @@ def get_task_timestamps(token, record_id = None, transposed = False):
         markers['record_id'] = record_id
         markers['timestamp_est'] = pd.to_datetime(visit_date + ' ' + markers['timestamp_est'])
         markers = markers[['record_id', 'marker', 'timestamp_est']]
+        markers['timestamp_est'] = markers['timestamp_est'].dt.tz_localize('America/New_York')  
+
     elif transposed == True and record_id == None:
         print('cannot transpose without selecting a record id')
 
