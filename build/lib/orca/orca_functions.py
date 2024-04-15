@@ -114,9 +114,13 @@ def get_task_timestamps(token, record_id = None, transposed = False):
     import io
 
     visit_notes = get_orca_data(token, form = "visit_notes_4m", form_complete=False)
+
     if record_id != None:
         visit_notes = visit_notes[visit_notes['record_id'] == record_id]
         visit_notes.reset_index(drop=True, inplace=True)
+        visit_date = str(visit_notes['visit_date_4m'])
+        visit_date = visit_date.split()[1]
+
         markers = visit_notes[['richards_start_4m', 'richards_end_4m', 'vpc_start_4m', 'vpc_end_4m','srt_start_4m', 'srt_end_4m', 'cecile_start_4m', 'cecile_end_4m','relational_memory_start_4m', 'relational_memory_end_4m', 'notoy_start_real_4m','notoy_end_real_4m', 'toy_start_real_4m', 'toy_end_real_4m']]
     else:
         markers = visit_notes[['record_id', 'richards_start_4m', 'richards_end_4m', 'vpc_start_4m', 'vpc_end_4m','srt_start_4m', 'srt_end_4m', 'cecile_start_4m', 'cecile_end_4m','relational_memory_start_4m', 'relational_memory_end_4m', 'notoy_start_real_4m','notoy_end_real_4m', 'toy_start_real_4m', 'toy_end_real_4m']]
@@ -126,6 +130,7 @@ def get_task_timestamps(token, record_id = None, transposed = False):
         markers = markers.rename_axis('marker').reset_index()
         markers.columns = ['marker', 'timestamp_est']
         markers['record_id'] = record_id
+        markers['timestamp_est'] = pd.to_datetime(visit_date + ' ' + markers['timestamp_est'])
         markers = markers[['record_id', 'marker', 'timestamp_est']]
     elif transposed == True and record_id == None:
         print('cannot transpose without selecting a record id')
