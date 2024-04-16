@@ -377,3 +377,20 @@ def get_movesense_off_times(token, record_id):
     child_last_time = pd.to_datetime(date + ' ' + child_last_time)    
 
     return parent_last_time, child_last_time
+
+
+
+def find_closest_timestamp(timestamp, timestamps):
+    """
+    Takes a single timestamp and finds its closest match within a time series column/vector
+
+    Args:
+        timestamp (datetime): The single timestamp you wish to match
+        timestamps (datetime): The time series you wish to find the match within. Must be the same format as timestamp
+
+    Returns:
+        A single value from timestamps which is the closest match to timestamp
+    """
+    closest_timestamp = min(timestamps, key=lambda x: abs((timestamp - x).total_seconds()))
+
+    return closest_timestamp
