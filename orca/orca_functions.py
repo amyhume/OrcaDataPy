@@ -396,6 +396,9 @@ def find_closest_timestamp(timestamp, timestamps):
     return closest_timestamp
 
 def segment_full_ecg(ecg_file, marker_column, start_marker, end_marker):
+    import pandas as pd
+    from datetime import datetime
+    pd.options.mode.chained_assignment = None  # default='warn'
     """
     Segments a file based on markers within a particular column
 
