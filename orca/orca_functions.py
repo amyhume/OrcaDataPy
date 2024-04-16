@@ -394,3 +394,37 @@ def find_closest_timestamp(timestamp, timestamps):
     closest_timestamp = min(timestamps, key=lambda x: abs((timestamp - x).total_seconds()))
 
     return closest_timestamp
+
+def segment_full_ecg(ecg_file, marker_column, start_marker, end_marker):
+    """
+    Segments a file based on markers within a particular column
+
+    Args:
+        ecg_file (pandas.DataFrame): the name of a pandas dataframe in your environment to segment
+        marker_column (str): the name of the column in ecg_file containing your markers. Must be a string
+        start_marker (str): the marker of the row you wish to segment after. Must be a string
+        end_marker (str): the marker of the row you wish to segment until. Must be a string
+
+    Returns:
+        pandas.DataFrame: DF containing all rows between your two markers
+    """
+    segmented_signals = None
+    if marker_column in ecg_file.columns:
+        if start_marker in ecg_file[marker_column].values and end_marker in ecg_file[marker_column].values:
+            first_index = ecg_file.index[ecg_file[marker_column] == start_marker][0]
+            last_index = ecg_file.index[ecg_file[marker_column] == end_marker][0]
+            segmented_signals = ecg_file.iloc[first_index:last_index+1]
+        elif start_marker not in ecg_file[marker_column].values and end_marker in ecg_file[marker_column].values:
+            print('cannot segment file: ' + start_marker + ' not present in file')
+        elif start_marker in ecg_file[marker_column].values and end_marker not in ecg_file[marker_column].values:
+            print('cannot segment file: ' + end_marker + ' not present in file')
+        else:
+            print('cannot segment file: neither marker present in file')
+    else:
+        print('cannot segment file: ' + marker_column + " is not present in the file")
+    
+
+    if segmented_signals is not None:
+        return segmented_signals
+    else:
+        print('cannot return file as was unable to segment')
