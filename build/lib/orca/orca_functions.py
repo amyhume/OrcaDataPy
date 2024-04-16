@@ -425,6 +425,7 @@ def segment_full_ecg(ecg_file, marker_column, start_marker, end_marker):
     
 
     if segmented_signals is not None:
+        segmented_signals['timestamp_relative'] = (segmented_signals['timestamp_est_corrected'] - segmented_signals['timestamp_est_corrected'].min()).dt.total_seconds()
         return segmented_signals
     else:
         print('cannot return file as was unable to segment')
