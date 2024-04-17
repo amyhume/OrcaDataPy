@@ -340,43 +340,61 @@ def check_timestamps(token, record_id):
 
 
 
-def get_movesense_off_times(token, record_id):
+def get_movesense_times(token, record_id, who):
     """
     Pulls test recording times for each movesense device in order parent, child.
 
     Args:
         token (str): The API token for the project.
         record_id (str): the record id you wish to pull (e.g. '218')
+        who (str): 'cg' or 'child' 
 
     Returns:
-        a character vector with the parent time followed by child time
+        a character vector with the on time followed by off time
 
     """
     import requests
     import pandas as pd
     import io
     from datetime import datetime
-    parent_last_time = get_orca_field(token, field = "cg_movesense_test_time_4m")
-    child_last_time = get_orca_field(token, field = "child_movesense_test_time_4m")
+    import numpy as np
+    import pytz
 
-    parent_last_time = parent_last_time[parent_last_time['record_id'] == record_id]
-    child_last_time = child_last_time[child_last_time['record_id'] == record_id] 
+    visit_notes = get_orca_data(token, form = "visit_notes_4m", form_complete=False)
+    movesense_times = visit_notes[['record_id', 'cg_movesense_on_4m',"child_movesense_on_4m", "cg_movesense_off_4m", "child_movesense_off_4m"]]
+    movesense_times = movesense_times[movesense_times['record_id'] == record_id]
 
     date = get_orca_field(token, field = 'visit_date_4m')
     date = date[date['record_id'] == record_id]
     date = str(date['visit_date_4m'])
     date = date.split()[1]
 
+    if who == 'cg':
+        on_time = str(movesense_times['cg_movesense_on_4m']).split()[1]
+        off_time = str(movesense_times['cg_movesense_off_4m']).split()[1]
+        if on_time != 'NaN' and off_time != 'NaN':
+            on_time = pd.to_datetime(date+ ' ' + on_time)
+            off_time = pd.to_datetime(date+ ' ' + off_time)
+        elif on_time != 'NaN' and off_time == 'NaN':
+            on_time = pd.to_datetime(date+ ' ' + on_time)
+        elif on_time == 'NaN' and off_time != 'NaN':
+            off_time = pd.to_datetime(date+ ' ' + off_time)
+        
+    elif who == 'child':
+        on_time = str(movesense_times['child_movesense_on_4m']).split()[1]
+        off_time = str(movesense_times['child_movesense_off_4m']).split()[1]
+        if on_time != 'NaN' and off_time != 'NaN':
+            on_time = pd.to_datetime(date+ ' ' + on_time)
+            off_time = pd.to_datetime(date+ ' ' + off_time)
+        elif on_time != 'NaN' and off_time == 'NaN':
+            on_time = pd.to_datetime(date+ ' ' + on_time)
+        elif on_time == 'NaN' and off_time != 'NaN':
+            off_time = pd.to_datetime(date+ ' ' + off_time)
 
-    parent_last_time = str(parent_last_time['cg_movesense_test_time_4m'])
-    parent_last_time = parent_last_time.split()[1]
-    child_last_time = str(child_last_time['child_movesense_test_time_4m'])
-    child_last_time = child_last_time.split()[1]
+    on_time = pytz.timezone('America/New_York').localize(on_time) if on_time != 'NaN' else pd.NaT
+    off_time = pytz.timezone('America/New_York').localize(off_time) if off_time != 'NaN' else pd.NaT
 
-    parent_last_time = pd.to_datetime(date + ' ' + parent_last_time)
-    child_last_time = pd.to_datetime(date + ' ' + child_last_time)    
-
-    return parent_last_time, child_last_time
+    return on_time, off_time
 
 
 
@@ -432,3 +450,45 @@ def segment_full_ecg(ecg_file, marker_column, start_marker, end_marker):
         return segmented_signals
     else:
         print('cannot return file as was unable to segment')
+
+def get_visit_datetime(token, record_id = None, merged = True):
+    """
+    Pulls the visit start date time for all ids / a specified ID
+
+    Args:
+        token (str): The API token for the project.
+        record_id (str): record_id you want to specify. Default is None and will pull all IDs
+        merged (bool): Whether to return the merged datetime or date and time as separate columns. Default is True
+
+    Returns:
+        pandas.DataFrame: if record_id = None or merged = False containing record_id, date, time, datetime
+        datetime value: a tz-conscious datetime variable representing the start of the visit, if record_id != None and merged = True
+    """
+    import requests
+    import pandas as pd
+    import io
+    from datetime import datetime
+    import pytz
+
+    visit_notes = get_orca_data(token, form = "visit_notes_4m", form_complete=False)
+    data = visit_notes[['record_id', 'visit_date_4m', 'visit_time_4m']]
+    data = data[data['visit_date_4m'].notna() | data['visit_time_4m'].notna()]
+
+    data['visit_date_4m'] = pd.to_datetime(data['visit_date_4m'])
+    data['visit_time_4m'] = pd.to_datetime(data['visit_time_4m'], format='%H:%M').dt.time
+
+    if record_id == None and merged == False:
+        return data
+    elif record_id == None and merged == True:
+        data['visit_datetime_4m'] = data['visit_date_4m'] + pd.to_timedelta(data['visit_time_4m'].astype(str))
+        data['visit_datetime_4m'] = data['visit_datetime_4m'].dt.tz_localize('America/New_York')
+        return data
+    elif record_id != None and merged == False:
+        data = data[data['record_id'] == record_id]
+        return data
+    elif record_id != None and merged == True:
+        data = data[data['record_id'] == record_id]
+        data['visit_datetime_4m'] = data['visit_date_4m'] + pd.to_timedelta(data['visit_time_4m'].astype(str))
+        data['visit_datetime_4m'] = data['visit_datetime_4m'].dt.tz_localize('America/New_York')
+        value = data['visit_datetime_4m'].iloc[0]
+        return value
