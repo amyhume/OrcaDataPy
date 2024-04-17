@@ -492,3 +492,25 @@ def get_visit_datetime(token, record_id = None, merged = True):
         data['visit_datetime_4m'] = data['visit_datetime_4m'].dt.tz_localize('America/New_York')
         value = data['visit_datetime_4m'].iloc[0]
         return value
+
+def check_ecg_recording_n(ecg_file, column_name = 'timestamp_est'):
+    """
+    Checks number of ecg recordings within a file
+
+    Args:
+        ecg_file (pandas.DataFrame): 
+        column_name (str): column name of the timestamp column you wish to check
+
+    Returns:
+        int: integer reflecting the number of recordings in the file
+    """
+    import pandas as pd
+
+    ecg_file['time_diff'] = ecg_file[column_name].diff()
+    max_gap = pd.Timedelta(seconds=1)
+    ecg_file['new_recording'] = ecg_file['time_diff'] > max_gap
+    ecg_file['recording_id'] = (ecg_file['new_recording'].cumsum() + 1).astype(int)
+
+    unique_recording_ids = ecg_file['recording_id'].nunique()
+    
+    return unique_recording_ids
