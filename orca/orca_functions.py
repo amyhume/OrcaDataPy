@@ -520,7 +520,7 @@ def calculate_ecg_timestamps(ecg_data, start_time, end_time, sample_rate=256):
     Calculates timestamps of a time series ecg dataframe according to either the start time or end time, and sampling rate
 
     Args:
-        ecg_file (pandas.DataFrame): 
+        ecg_data (pandas.DataFrame): 
         start_time (datetime.datetime, optional): Datetime object of the start time of the ecg recording
         end_time (datetime.datetime, optional): Datetime object of the end time of the ecg recording
         sample_rate (int): Sampling rate of your ecg recording. Default is 256
@@ -563,3 +563,29 @@ def calculate_ecg_timestamps(ecg_data, start_time, end_time, sample_rate=256):
         print('No margin of error can be returned as only start time or end time was provided')
         return ecg_data
 
+
+def calculate_ecg_drift(ecg_data, incorrect_times = 'timestamp_est_uncorrected', correct_times = 'timestamp_est_corrected'):
+    """
+    Calculates drift within a dataframe between 2 timeseries columns
+
+    Args:
+        ecg_data (pandas.DataFrame): dataframe with timeseries data
+        incorrect_times (datetime.datetime): Datetime series 1
+        correct_times (datetime.datetime): Datetime series 2
+
+    Returns:
+        drift_at_start (timedelta): time difference between the first samples of each time column
+        drift_at_end (timedelta): time difference between the last samples of each time column
+        drift_change (timedelta): change in drift between start and end of file
+    """
+    incorrect_start = min(ecg_data[incorrect_times])
+    correct_start = min(ecg_data[correct_times])
+    drift_at_start = abs(incorrect_start - correct_start)
+
+    incorrect_end = max(ecg_data[incorrect_times])
+    correct_end = max(ecg_data[correct_times])
+    drift_at_end = abs(incorrect_end - correct_end)
+
+    drift_change = abs(drift_at_start - drift_at_end)
+
+    return drift_at_start, drift_at_end, drift_change
