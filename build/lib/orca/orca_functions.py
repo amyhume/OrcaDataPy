@@ -510,12 +510,12 @@ def check_ecg_recording_n(ecg_data, column_name = 'timestamp_est'):
     max_gap = pd.Timedelta(seconds=1)
     ecg_data['new_recording'] = ecg_data['time_diff'] > max_gap
     ecg_data['recording_id'] = (ecg_data['new_recording'].cumsum() + 1).astype(int)
-    ecg_data.drop(columns=['new_recording'], inplace=True)
+    ecg_data.drop(columns=['new_recording', 'time_diff'], inplace=True)
     unique_recording_ids = ecg_data['recording_id'].nunique()
     
     return unique_recording_ids
 
-def calculate_ecg_timestamps(ecg_data, start_time = None, end_time = None, sample_rate=256):
+def calculate_ecg_timestamps(ecg_data, start_time, end_time, sample_rate=256):
     """
     Calculates timestamps of a time series ecg dataframe according to either the start time or end time, and sampling rate
 
@@ -530,6 +530,7 @@ def calculate_ecg_timestamps(ecg_data, start_time = None, end_time = None, sampl
         timedelta object: Number or seconds different between the new end_time of timestamp_est_corrected and the end_time provided. Only returned if both start_time and end_time != None
     """
     from datetime import datetime, timedelta
+    import pandas as pd
 
     #calculating number of samples in df, duration of file and subsequent time incrememnt per sample
     num_samples = len(ecg_data)
@@ -537,16 +538,16 @@ def calculate_ecg_timestamps(ecg_data, start_time = None, end_time = None, sampl
     time_increment_per_sample = duration / num_samples
 
     #Calculating timestamps based on num_samples, sample_rate and start time
-    if start_time != None:
+    if pd.notna(start_time):
         timestamps = [start_time + i * timedelta(seconds=time_increment_per_sample) for i in range(num_samples)]
         ecg_data['timestamp_est_corrected'] = timestamps
     #if there is no start time, only end time, end time will be used and timestamp calculated backwards
-    elif start_time == None and end_time != None:
+    elif pd.isna(start_time) and pd.notna(end_time):
         timestamps = [end_time - (num_samples - i) * timedelta(seconds=time_increment_per_sample) for i in range(num_samples)]
         ecg_data['timestamp_est_corrected'] = timestamps
     
     #if both start and end time present, the new end time is compared to expected end time and 'margin of error' calculated
-    if start_time != None and end_time != None:
+    if pd.notna(start_time) and pd.notna(end_time):
         new_max = max(ecg_data['timestamp_est_corrected'])
         margin_of_error = abs(end_time-new_max)
         #setting threshold for MOE check
