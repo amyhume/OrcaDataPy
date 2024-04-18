@@ -560,8 +560,9 @@ def calculate_ecg_timestamps(ecg_data, start_time, end_time, sample_rate=256):
             print('There is more than a 1 second difference between the last sample and expected last sample. Check!')
             return ecg_data, margin_of_error
     else:
+        margin_of_error = None
         print('No margin of error can be returned as only start time or end time was provided')
-        return ecg_data
+        return ecg_data, margin_of_error
 
 
 def calculate_ecg_drift(ecg_data, incorrect_times = 'timestamp_est_uncorrected', correct_times = 'timestamp_est_corrected'):
