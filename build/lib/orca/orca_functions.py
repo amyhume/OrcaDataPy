@@ -590,3 +590,37 @@ def calculate_ecg_drift(ecg_data, incorrect_times = 'timestamp_est_uncorrected',
     drift_change = abs(drift_at_start - drift_at_end)
 
     return drift_at_start, drift_at_end, drift_change
+
+
+def checking_multiple_recordings(ecg_data, column_name = 'recording_id'):
+    """
+    For ecg files with multiple recordings, it will print out the start time of each recording and ask the user to choose which one is the visit recording. It will filter the dataframe based on that.
+
+    Args:
+        ecg_file (pandas.DataFrame): 
+        column_name (str): column name of the recording id column
+
+    Returns:
+        pandas.DataFrame: Your ecg_data filtered by user_response
+    """
+    import pandas as pd
+    unique_recording_ids_n = ecg_data['recording_id'].nunique()
+    unique_recording_ids = ecg_data['recording_id'].unique()
+    if unique_recording_ids_n > 1:
+        for recording_id in unique_recording_ids:
+            first_row = ecg_data.loc[ecg_data['recording_id'] == recording_id].iloc[0]
+            timestamp_value = first_row['timestamp_est_uncorrected']
+            print("Start time for recording " + str(recording_id) + ": " + str(timestamp_value))
+        print("\n")
+        user_response = input("Enter correct recording number here as an integer. If you do not know, enter '0' and then go away and check: ")   
+
+        if user_response == '0':
+            print("\n")
+            print('dataset left unfiltered. Go and check the recording and then come back and filter')
+        else:
+            ecg_data = ecg_data[ecg_data['recording_id'] == int(user_response)]
+
+    else:
+        print('only one recording present in the dataset')
+    
+    return ecg_data
