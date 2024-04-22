@@ -688,7 +688,6 @@ def import_data(token, data):
 
     #checking conflicts
     conflicts_for = []
-    column = columns[2]
     for column in columns:
         column_data = test[['record_id', 'redcap_event_name', column+'_x', column+'_y']]
         column_data = column_data.dropna(subset=[column_data.columns[2], column_data.columns[3]])
