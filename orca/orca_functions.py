@@ -649,7 +649,9 @@ def checking_multiple_recordings(ecg_data, column_name = 'recording_id'):
         for recording_id in unique_recording_ids:
             first_row = ecg_data.loc[ecg_data['recording_id'] == recording_id].iloc[0]
             timestamp_value = first_row['timestamp_est_uncorrected']
-            print("Start time for recording " + str(recording_id) + ": " + str(timestamp_value))
+            test = ecg_data[ecg_data['recording_id'] == int(recording_id)]
+            duration = max(test['timestamp_est_uncorrected']) - min(test['timestamp_est_uncorrected'])
+            print("Start time for recording " + str(recording_id) + ": " + str(timestamp_value) + "; Duration: " + str(duration))
         print("\n")
         user_response = input("Enter correct recording number here as an integer. If you do not know, enter '0' and then go away and check: ")   
 
