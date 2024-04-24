@@ -5,4 +5,5 @@ OrcaDataPy.egg-info/SOURCES.txt
 OrcaDataPy.egg-info/dependency_links.txt
 OrcaDataPy.egg-info/top_level.txt
 orca/__init__.py
-orca/orca_functions.py
+orca/orca_ecg_functions.py
+orca/orca_redcap_functions.py
