@@ -5,18 +5,22 @@
 url = 'https://redcap.nyu.edu/api/'
 
 #1-----------------------
-def find_closest_timestamp(timestamp, timestamps):
+def find_closest_timestamp(timestamp, timestamps, type = 'numeric'):
     """
     Takes a single timestamp and finds its closest match within a time series column/vector
 
     Args:
         timestamp (datetime): The single timestamp you wish to match
         timestamps (datetime): The time series you wish to find the match within. Must be the same format as timestamp
+        method (str): numeric time values (e.g. seconds, milliseconds) or datetime
 
     Returns:
         A single value from timestamps which is the closest match to timestamp
     """
-    closest_timestamp = min(timestamps, key=lambda x: abs((timestamp - x).total_seconds()))
+    if type == 'relative':
+        closest_timestamp = min(timestamps, key=lambda x: abs(timestamp - x))
+    elif type == 'absolute':
+        closest_timestamp = min(timestamps, key=lambda x: abs((timestamp - x).total_seconds()))
 
     return closest_timestamp
 #-----------------------
