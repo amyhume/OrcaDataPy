@@ -17,9 +17,9 @@ def find_closest_timestamp(timestamp, timestamps, type = 'numeric'):
     Returns:
         A single value from timestamps which is the closest match to timestamp
     """
-    if type == 'relative':
+    if type == 'numeric':
         closest_timestamp = min(timestamps, key=lambda x: abs(timestamp - x))
-    elif type == 'absolute':
+    elif type == 'datetime':
         closest_timestamp = min(timestamps, key=lambda x: abs((timestamp - x).total_seconds()))
 
     return closest_timestamp
