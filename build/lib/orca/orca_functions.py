@@ -756,3 +756,195 @@ def calculate_ecg_drift(ecg_data, incorrect_times = 'timestamp_est_uncorrected',
 
     return drift_at_start, drift_at_end, drift_change
 #-----------------------
+
+#7-----------------------
+def extract_ibi(file):
+    """
+    Extracts ibi (ms) and time (ms and s) from a matlab file 
+
+    Args:
+        file (str): A file path of your matlab file
+
+    Returns:
+        data (pandas.DataFrame): data frame with time_s and time_ms of beat times plus ibi in ms
+    """
+    import h5py
+    import pandas as pd
+    import numpy as np
+
+    with h5py.File(file, 'r') as hdf_file:
+    # Read the datasets
+        time_s = hdf_file['/Res/HRV/Data/T_RR'][:]
+        ibi_ms = hdf_file['/Res/HRV/Data/RR'][:] *1000  # Convert to milliseconds
+
+    ibi_ms_with_na = np.insert(ibi_ms, 0, np.nan)
+
+    # Create a DataFrame
+    data = pd.DataFrame({
+        'time_s': time_s.flatten(),
+        'time_ms': time_s.flatten() * 1000,  # Create time_ms directly
+        'ibi_ms': ibi_ms_with_na.flatten()
+    })
+
+
+    return data
+#-----------------------
+
+#8-----------------------
+def extract_task_ibi(task):
+    """
+    Batch processes IBI matlab files for a given task
+
+    Args:
+        task (str): The task you want to process: 'Richards', 'VPC', 'SRT', 'Cecile', 'Relational Memory', 'Freeplay'
+
+    Returns:
+        temp_log (pandas.DataFrame): A logbook of each file processed and the mean / sd ibi values 
+        task_import (pandas.DataFrame): The same info as temp_log but in wide format and with columns renamed for redcap import
+    """
+    import h5py
+    import pandas as pd
+    import os
+    import numpy as np
+    from datetime import date as dt
+    #pulling task matlab files
+    task_matlab_path = os.path.join("/Volumes/ISLAND/Projects/ORCA/ORCA 2.0/Data/4 Months/Heart Rate Data", task, "Beat Corrected Matlab Files")
+    files = [file for file in os.listdir(task_matlab_path) if 'processed' not in file and '.DS_Store' not in file]
+    
+    print("\n", "The following ", task, " files will be processed:", "\n", "\n", files)
+    response = input("\n"+'Continue to process (y/n):')
+    temp_log = pd.DataFrame()
+    task_import_cg = pd.DataFrame()
+    task_import_child = pd.DataFrame()
+
+    if response == 'y' and len(files) >= 1:
+        for file in files:
+            #File Info
+            who = 'child' if 'child' in file else 'cg'
+            id = file.split("_")[0]
+            data = extract_ibi(os.path.join(task_matlab_path, file))
+            
+            #finding ecg markers
+            ecg_path = os.path.join("/Volumes/ISLAND/Projects/ORCA/ORCA 2.0/Data/4 Months/Heart Rate Data", task, "Raw ECG Data")
+            ecg_file = [ecg_file for ecg_file in os.listdir(ecg_path) if id in ecg_file and "_"+who in ecg_file][0]
+            ecg_data = pd.read_csv(os.path.join(ecg_path, ecg_file))
+
+            ecg_data = (ecg_data
+                        .loc[:, ['marker', 'timestamp_relative']]
+                        .dropna(subset=['marker'])
+                        .reset_index(drop=True))
+
+            closest_timestamps = []
+            for index in ecg_data.index:
+                closest_timestamp = find_closest_timestamp(ecg_data.iloc[index, 1], data['time_s'], type='numeric')
+                closest_timestamps.append(closest_timestamp)
+
+            ecg_data['time_s'] = closest_timestamps
+            ecg_data = ecg_data[['time_s', 'marker']]
+            data = pd.merge(data,ecg_data, on='time_s', how='left')
+
+            #saving IBI csv
+            ibi_path = os.path.join("/Volumes/ISLAND/Projects/ORCA/ORCA 2.0/Data/4 Months/Heart Rate Data", task, "IBI Files")
+            ibi_file_name = id+"_4m_" + who + "_ibi_" + task.lower() + ".csv" 
+            data.to_csv(os.path.join(ibi_path, ibi_file_name), index=False)
+
+            #renaming original matlab file
+            old_matlab = os.path.join(task_matlab_path, file)
+            new_matlab = os.path.join(task_matlab_path, id+"_4m_"+who+"_ecg_"+task.lower()+"_hrv_processed.mat")
+            os.rename(old_matlab, new_matlab)
+            print('extracted ibi and saved csv for ', file)
+
+            #Calculating Descriptives
+
+            if task.lower() != 'freeplay':
+                temp_data = pd.DataFrame([{
+                    'record_id': id,
+                    'who': who,
+                    'date': dt.today(),
+                    'percent_noise': ((data['ibi_ms'].iloc[1:].isna().sum() / (len(data) - 1)) * 100),
+                    'ibi_mean': np.nanmean(data['ibi_ms']),
+                    'ibi_sd': np.nanstd(data['ibi_ms']),
+                    'max_ibi': np.nanmax(data['ibi_ms']),
+                    'min_ibi': np.nanmin(data['ibi_ms'])
+                }])
+
+                temp_log = temp_data if temp_log.empty else temp_log.merge(temp_data, how='outer')
+
+                #creating import file
+                import_file = temp_data[['record_id', 'date', 'percent_noise', 'ibi_mean', 'ibi_sd']]
+                import_file = import_file.copy()
+                import_file.rename(columns={
+                    'date': who + "_" + task.lower() + "_ibi_date_4m", 
+                    'percent_noise': who + "_" + task.lower() + "_ibi_noise_4m", 
+                    'ibi_mean': who + "_" + task.lower() + "_ibi_m_4m", 
+                    'ibi_sd': who + "_" + task.lower() + "_ibi_sd_4m"}, inplace=True)
+                import_file['redcap_event_name'] = 'orca_4month_arm_1'
+
+                import_file[who + "_" + task.lower() + "_ibi_date_4m"] =import_file[who + "_" + task.lower() + "_ibi_date_4m"].astype(str)
+
+                if who == 'cg':
+                    task_import_cg = import_file if task_import_cg.empty else task_import_cg.merge(import_file, how = 'outer')
+                elif who == 'child':
+                    task_import_child = import_file if task_import_child.empty else task_import_child.merge(import_file, how = 'outer')
+
+            elif task.lower() == 'freeplay':
+                notoy_start = data[data['marker'] == 'notoy_start_real_4m'].index[0]
+                notoy_end = data[data['marker'] == 'notoy_end_real_4m'].index[0]
+                toy_start = data[data['marker'] == 'toy_start_real_4m'].index[0]
+                toy_end = data[data['marker'] == 'toy_end_real_4m'].index[0]
+                
+                nt_data = data.loc[notoy_start:notoy_end]
+                t_data = data.loc[toy_start:toy_end]
+
+                temp_data = pd.DataFrame([{
+                    'record_id': id,
+                    'who': who,
+                    'date': dt.today(),
+                    'percent_noise': ((data['ibi_ms'].iloc[1:].isna().sum() / (len(data) - 1)) * 100),
+                    'ibi_mean': np.nanmean(data['ibi_ms']),
+                    'ibi_sd': np.nanstd(data['ibi_ms']),
+                    'max_ibi': np.nanmax(data['ibi_ms']),
+                    'min_ibi': np.nanmin(data['ibi_ms']),
+                    'percent_noise_nt': ((nt_data['ibi_ms'].iloc[1:].isna().sum() / (len(nt_data) - 1)) * 100),
+                    'ibi_mean_nt': np.nanmean(nt_data['ibi_ms']),
+                    'ibi_sd_nt': np.nanstd(nt_data['ibi_ms']),
+                    'max_ibi_nt': np.nanmax(nt_data['ibi_ms']),
+                    'min_ibi_nt': np.nanmin(nt_data['ibi_ms']),
+                    'percent_noise_t': ((t_data['ibi_ms'].iloc[1:].isna().sum() / (len(t_data) - 1)) * 100),
+                    'ibi_mean_t': np.nanmean(t_data['ibi_ms']),
+                    'ibi_sd_t': np.nanstd(t_data['ibi_ms']),
+                    'max_ibi_t': np.nanmax(t_data['ibi_ms']),
+                    'min_ibi_t': np.nanmin(t_data['ibi_ms']),
+                }])
+
+                temp_log = temp_data if temp_log.empty else temp_log.merge(temp_data, how='outer')
+
+                #creating import file
+                import_file = temp_data[['record_id', 'date', 'percent_noise', 'ibi_mean', 'ibi_sd','percent_noise_nt', 'ibi_mean_nt', 'ibi_sd_nt', 'percent_noise_t', 'ibi_mean_t', 'ibi_sd_t']]
+                import_file = import_file.copy()
+                import_file.rename(columns={
+                    'date': who + "_" + task.lower() + "_ibi_date_4m", 
+                    'percent_noise': who + "_" + task.lower() + "_ibi_noise_4m", 
+                    'ibi_mean': who + "_" + task.lower() + "_ibi_m_4m", 
+                    'ibi_sd': who + "_" + task.lower() + "_ibi_sd_4m", 
+                    'percent_noise_nt': who + "_notoy_ibi_noise_4m", 
+                    'ibi_mean_nt': who + "_notoy_ibi_m_4m", 
+                    'ibi_sd_nt': who +"_notoy_ibi_sd_4m", 
+                    'percent_noise_t': who + "_toy_ibi_noise_4m", 
+                    'ibi_mean_t': who + "_toy_ibi_m_4m", 
+                    'ibi_sd_t': who +"_toy_ibi_sd_4m"}, 
+                    inplace=True)
+                
+                import_file['redcap_event_name'] = 'orca_4month_arm_1'
+                import_file[who + "_" + task.lower() + "_ibi_date_4m"] =import_file[who + "_" + task.lower() + "_ibi_date_4m"].astype(str)
+
+                if who == 'cg':
+                    task_import_cg = import_file if task_import_cg.empty else task_import_cg.merge(import_file, how = 'outer')
+                elif who == 'child':
+                    task_import_child = import_file if task_import_child.empty else task_import_child.merge(import_file, how = 'outer')
+                
+        task_import = task_import_cg.merge(task_import_child, on=['record_id', 'redcap_event_name'], how="outer")
+        return temp_log, task_import
+    else:
+        print('batch ibi extraction terminated')
+        return None, None
