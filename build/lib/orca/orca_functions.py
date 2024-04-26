@@ -549,6 +549,64 @@ def import_data(token, data):
         print('\n','Data import terminated')
 #-----------------------
 
+def import_data2(token, data):
+    """
+    Imports pandas dataframe into redcap
+
+    Args:
+        token (str): The API token for the project.
+        data (pandas.DataFrame): Data you want to import. Column names must be same as field names in codebook. redcap event name must be included.
+
+    """
+    import pandas as pd
+    from redcap import Project, RedcapError
+    unique_events = data['redcap_event_name'].unique()
+    all = get_all_data(token)
+
+    all = all[all['redcap_event_name'].isin(unique_events)]
+
+    all = all[data.columns.intersection(all.columns)]
+    test = pd.merge(all, data, on=['record_id', 'redcap_event_name'], how='right')
+    columns = [col for col in all.columns if col not in ['record_id', 'redcap_event_name']]
+
+    #checking conflicts
+    conflicts_for = []
+    for column in columns:
+        column_data = test[['record_id', 'redcap_event_name', column+'_x', column+'_y']]
+        column_data = column_data.dropna(subset=[column_data.columns[2], column_data.columns[3]])
+        column_data = column_data[column_data.iloc[:, 2] != column_data.iloc[:, 3]]
+
+        if len(column_data) >= 1:
+            print('\n','conflict found for field: ', column)
+            print('\n', column_data.to_string())
+            print("\n")
+            conflicts_for.append(column)
+    
+    if len(conflicts_for) >= 1:
+        print("Check the datasets above carefully. columns x represent the existing data contents, column y represents the data that will overwrite\n",
+        "If column x contains data, this import will OVERWRITE that existing data\n",
+        "If the cell contents are the same, there is no new data to import")
+    else:
+        print("\n", 'no conflicts found. No data will be overwritten. check the import data carefully:',"\n\n",data, "\n")
+
+    response = input("Do you want to continue? (y/n): ")
+
+    if response.lower() == 'y':
+        project = Project(url, token)
+
+        for index, row in data.iterrows():
+            temp_row = data.iloc[index]
+            temp_row = temp_row.dropna()
+        # Convert DataFrame to a list of dictionaries (one dictionary per row)
+            records = temp_row.to_dict()
+
+            try:
+                import_status = project.import_records(records)
+                print("Data import completed for ", import_status['count'], " record(s)")
+            except RedcapError as e:
+                print(f"Error importing data: {e}")
+    else:
+        print('\n','Data import terminated')
 
 #ORCA ECG Processing Functions
 #all these functions are used for processing ECG data from ORCA
