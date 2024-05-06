@@ -621,7 +621,8 @@ def segment_full_ecg(ecg_file, marker_column, start_marker, end_marker):
         return segmented_signals
     else:
         print('will return empty dataframe as was unable to segment')
-        return pd.DataFrame()
+        empty_data = pd.DataFrame(columns=[])
+        return empty_data
 
 #-----------------------
 
