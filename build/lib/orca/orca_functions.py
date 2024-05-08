@@ -620,7 +620,6 @@ def segment_full_ecg(ecg_file, marker_column, start_marker, end_marker):
         segmented_signals['timestamp_relative'] = (segmented_signals['timestamp_est_corrected'] - segmented_signals['timestamp_est_corrected'].min()).dt.total_seconds()
         return segmented_signals
     else:
-        print('will return empty dataframe as was unable to segment')
         empty_data = pd.DataFrame(columns=[])
         return empty_data
 
@@ -852,6 +851,33 @@ def extract_task_ibi(token, task):
             ecg_data = ecg_data[['time_s', 'marker']]
             data = pd.merge(data,ecg_data, on='time_s', how='left')
 
+            #adding continuous conditions column to the ibi_file
+            markers = data[pd.notna(data['marker'])].reset_index(drop=True)
+            markers = markers[['time_s', 'marker']]
+            markers['condition'] = markers['marker'].str.split('_').str[0]
+
+            condition_list = []
+
+            for i, time in enumerate(data['time_s']):
+                for i2, marker_time in enumerate(markers['time_s']):
+                    if i2 != (markers.index.stop-1):
+                        if time >= marker_time and time < markers['time_s'][i2+1]:
+                            condition = markers['condition'][i2]
+                            break
+                        else:
+                            condition = np.nan
+                    else:
+                        if time >= marker_time:
+                            condition = markers['condition'][i2]
+                            break
+                        else:
+                            condition = np.nan
+                
+                condition_list.append(condition)
+
+
+            data['condition'] = condition_list
+
             #saving IBI csv
             ibi_path = os.path.join("/Volumes/ISLAND/Projects/ORCA/ORCA 2.0/Data/4 Months/Heart Rate Data", task, "IBI Files")
             ibi_file_name = id+"_4m_" + who + "_ibi_" + task.lower() + ".csv" 
@@ -897,13 +923,8 @@ def extract_task_ibi(token, task):
                     task_import_child = import_file if task_import_child.empty else task_import_child.merge(import_file, how = 'outer')
 
             elif task.lower() == 'freeplay':
-                notoy_start = data[data['marker'] == 'notoy_start_real_4m'].index[0]
-                notoy_end = data[data['marker'] == 'notoy_end_real_4m'].index[0]
-                toy_start = data[data['marker'] == 'toy_start_real_4m'].index[0]
-                toy_end = data[data['marker'] == 'toy_end_real_4m'].index[0]
-                
-                nt_data = data.loc[notoy_start:notoy_end]
-                t_data = data.loc[toy_start:toy_end]
+                nt_data = data[data['condition'] == 'notoy']
+                t_data = data[data['condition'] == 'toy']
 
                 temp_data = pd.DataFrame([{
                     'record_id': id,
@@ -957,3 +978,37 @@ def extract_task_ibi(token, task):
     else:
         print('batch ibi extraction terminated')
         return None, None
+#-----------------------
+
+#8-----------------------
+def create_epochs(data, size=3, time_column = 'time_s', value_column='ibi_ms', conditions=True, condition_column='condition'):
+    """
+    Creates time epochs for time series data
+
+    Args:
+        data (pandas.DataFrame): The time series data you wish to epoch
+        size (int): The size of your epochs in seconds (default is 3)
+        time_column (str): the name of the column containing your time values (in seconds)
+        value_column (str): the name of the column containing your value (e.g. ibi_ms)
+        conditions (boolean): Whether your data contains a continuous conditions column you wish to keep in your returned df. default is True
+        condition_column: The name of the column containing your conditions
+    Returns:
+        epoched_data (pandas.DataFrame): Df containing epoch_num, the epoch_s (max of range), mean value and condition (if condition = True)
+    """
+    import pandas as pd
+
+    data['timedelta'] = pd.to_timedelta(data[time_column], unit = 's')
+    data['epoch_range'] = pd.cut(data[time_column], bins=pd.interval_range(start=0, end=data[time_column].max()+3, freq=3, closed='right'), include_lowest=False, labels=False)
+    data['epoch_s'] = data['epoch_range'].apply(lambda x: x.right)
+    epoched_data = data.groupby('epoch_s', observed=False)[value_column].mean().reset_index()
+    epoched_data['epoch_num'] = range(1, len(epoched_data) + 1)
+
+    if conditions:
+        epoch_conditions = data[['epoch_s', 'condition']].drop_duplicates(subset=['epoch_s'])
+        epoched_data = pd.merge(epoched_data, epoch_conditions, how='left', on='epoch_s')
+        epoched_data = epoched_data[['epoch_num', 'epoch_s', 'ibi_ms', 'condition']]
+    else:
+        epoched_data = epoched_data[['epoch_num', 'epoch_s', 'ibi_ms']]
+
+
+    return(epoched_data)
