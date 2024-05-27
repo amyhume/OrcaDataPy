@@ -837,7 +837,7 @@ def extract_task_ibi(token, task):
     from datetime import date as dt
     #pulling task matlab files
     task_matlab_path = os.path.join("/Volumes/ISLAND/Projects/ORCA/ORCA 2.0/Data/4 Months/Heart Rate Data", task, "Beat Corrected Matlab Files")
-    files = [file for file in os.listdir(task_matlab_path) if 'processed' not in file and '.DS_Store' not in file]
+    files = [file for file in os.listdir(task_matlab_path) if 'processed' not in file and '.DS_Store' not in file and '.mat' in file]
     
     print("\n", "The following ", task, " files will be processed:", "\n", "\n", files)
     response = input("\n"+'Continue to process (y/n):')
