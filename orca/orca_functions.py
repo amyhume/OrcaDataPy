@@ -766,36 +766,56 @@ def calculate_ecg_drift(ecg_data, incorrect_times = 'timestamp_est_uncorrected',
 #-----------------------
 
 #7-----------------------
-def extract_ibi(file):
+def extract_ibi(file,method='interpolated'):
     """
     Extracts ibi (ms) and time (ms and s) from a matlab file 
 
     Args:
         file (str): A file path of your matlab file
+        method(str): whether you want to pull raw data or interpolated. raw has noise REMOVED and interpolated has noise interpolated
 
     Returns:
-        data (pandas.DataFrame): data frame with time_s and time_ms of beat times plus ibi in ms
+        data (pandas.DataFrame): data frame with time_s and time_ms of beat times, ibi in ms, and differenced IBIs 
     """
     import h5py
     import pandas as pd
     import numpy as np
 
-    with h5py.File(file, 'r') as hdf_file:
-    # Read the datasets
-        time_s = hdf_file['/Res/HRV/Data/T_RR'][:]
-        ibi_ms = hdf_file['/Res/HRV/Data/RR'][:] *1000  # Convert to milliseconds
+    #pulling interpolated data
+    if method == 'interpolated':
+        with h5py.File(file, 'r') as hdf_file:
+        # Read the datasets
+            time_s = hdf_file['/Res/HRV/Data/T_RRi'][:]
+            ibi_ms = hdf_file['/Res/HRV/Data/RRi'][:]*1000  # Convert to milliseconds
+            dt = hdf_file['/Res/HRV/Data/RRdti'][:]
 
-    ibi_ms_with_na = np.insert(ibi_ms, 0, np.nan)
+        # Create a DataFrame
+        data = pd.DataFrame({
+            'time_s': time_s[0],
+            'time_ms': time_s[0] * 1000,  # Create time_ms directly
+            'ibi_ms': ibi_ms[0],
+            'dt': dt[0]
+        })
+        return data
+    elif method == 'raw':
+        with h5py.File(file, 'r') as hdf_file:
+        # Read the datasets
+            time_s = hdf_file['/Res/HRV/Data/T_RR'][:]
+            ibi_ms = hdf_file['/Res/HRV/Data/RR'][:]  # Convert to milliseconds
+            dt = hdf_file['/Res/HRV/Data/RRdt'][:]
 
-    # Create a DataFrame
-    data = pd.DataFrame({
-        'time_s': time_s.flatten(),
-        'time_ms': time_s.flatten() * 1000,  # Create time_ms directly
-        'ibi_ms': ibi_ms_with_na.flatten()
-    })
+        # Create a DataFrame
+        data = pd.DataFrame({
+            'time_s': time_s[0],
+            'time_ms': time_s[0] * 1000,  # Create time_ms directly
+            'ibi_ms': ibi_ms[0],
+            'dt': dt[0]
+        })
 
+        return data
+    else:
+        print('please indicate whether you want to extract raw or interpolated IBI')
 
-    return data
 #-----------------------
 
 #8-----------------------
@@ -830,7 +850,7 @@ def extract_task_ibi(token, task):
             #File Info
             who = 'child' if 'child' in file else 'cg'
             id = file.split("_")[0]
-            data = extract_ibi(os.path.join(task_matlab_path, file))
+            data = extract_ibi(os.path.join(task_matlab_path, file), method='interpolated')
             
             #finding ecg markers
             ecg_path = os.path.join("/Volumes/ISLAND/Projects/ORCA/ORCA 2.0/Data/4 Months/Heart Rate Data", task, "Raw ECG Data")
@@ -896,7 +916,6 @@ def extract_task_ibi(token, task):
                     'record_id': id,
                     'who': who,
                     'date': dt.today(),
-                    'percent_noise': ((data['ibi_ms'].iloc[1:].isna().sum() / (len(data) - 1)) * 100),
                     'ibi_mean': np.nanmean(data['ibi_ms']),
                     'ibi_sd': np.nanstd(data['ibi_ms']),
                     'max_ibi': np.nanmax(data['ibi_ms']),
@@ -906,11 +925,10 @@ def extract_task_ibi(token, task):
                 temp_log = temp_data if temp_log.empty else temp_log.merge(temp_data, how='outer')
 
                 #creating import file
-                import_file = temp_data[['record_id', 'date', 'percent_noise', 'ibi_mean', 'ibi_sd']]
+                import_file = temp_data[['record_id', 'date', 'ibi_mean', 'ibi_sd']]
                 import_file = import_file.copy()
                 import_file.rename(columns={
                     'date': who + "_" + task.lower() + "_ibi_date_4m", 
-                    'percent_noise': who + "_" + task.lower() + "_ibi_noise_4m", 
                     'ibi_mean': who + "_" + task.lower() + "_ibi_m_4m", 
                     'ibi_sd': who + "_" + task.lower() + "_ibi_sd_4m"}, inplace=True)
                 import_file['redcap_event_name'] = 'orca_4month_arm_1'
@@ -930,17 +948,14 @@ def extract_task_ibi(token, task):
                     'record_id': id,
                     'who': who,
                     'date': dt.today(),
-                    'percent_noise': ((data['ibi_ms'].iloc[1:].isna().sum() / (len(data) - 1)) * 100),
                     'ibi_mean': np.nanmean(data['ibi_ms']),
                     'ibi_sd': np.nanstd(data['ibi_ms']),
                     'max_ibi': np.nanmax(data['ibi_ms']),
                     'min_ibi': np.nanmin(data['ibi_ms']),
-                    'percent_noise_nt': ((nt_data['ibi_ms'].iloc[1:].isna().sum() / (len(nt_data) - 1)) * 100),
                     'ibi_mean_nt': np.nanmean(nt_data['ibi_ms']),
                     'ibi_sd_nt': np.nanstd(nt_data['ibi_ms']),
                     'max_ibi_nt': np.nanmax(nt_data['ibi_ms']),
                     'min_ibi_nt': np.nanmin(nt_data['ibi_ms']),
-                    'percent_noise_t': ((t_data['ibi_ms'].iloc[1:].isna().sum() / (len(t_data) - 1)) * 100),
                     'ibi_mean_t': np.nanmean(t_data['ibi_ms']),
                     'ibi_sd_t': np.nanstd(t_data['ibi_ms']),
                     'max_ibi_t': np.nanmax(t_data['ibi_ms']),
@@ -950,17 +965,14 @@ def extract_task_ibi(token, task):
                 temp_log = temp_data if temp_log.empty else temp_log.merge(temp_data, how='outer')
 
                 #creating import file
-                import_file = temp_data[['record_id', 'date', 'percent_noise', 'ibi_mean', 'ibi_sd','percent_noise_nt', 'ibi_mean_nt', 'ibi_sd_nt', 'percent_noise_t', 'ibi_mean_t', 'ibi_sd_t']]
+                import_file = temp_data[['record_id', 'date', 'ibi_mean', 'ibi_sd', 'ibi_mean_nt', 'ibi_sd_nt', 'ibi_mean_t', 'ibi_sd_t']]
                 import_file = import_file.copy()
                 import_file.rename(columns={
                     'date': who + "_" + task.lower() + "_ibi_date_4m", 
-                    'percent_noise': who + "_" + task.lower() + "_ibi_noise_4m", 
                     'ibi_mean': who + "_" + task.lower() + "_ibi_m_4m", 
-                    'ibi_sd': who + "_" + task.lower() + "_ibi_sd_4m", 
-                    'percent_noise_nt': who + "_notoy_ibi_noise_4m", 
+                    'ibi_sd': who + "_" + task.lower() + "_ibi_sd_4m",  
                     'ibi_mean_nt': who + "_notoy_ibi_m_4m", 
                     'ibi_sd_nt': who +"_notoy_ibi_sd_4m", 
-                    'percent_noise_t': who + "_toy_ibi_noise_4m", 
                     'ibi_mean_t': who + "_toy_ibi_m_4m", 
                     'ibi_sd_t': who +"_toy_ibi_sd_4m"}, 
                     inplace=True)
