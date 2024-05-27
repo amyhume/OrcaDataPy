@@ -952,14 +952,14 @@ def extract_task_ibi(token, task):
                     'ibi_sd': np.nanstd(data['ibi_ms']),
                     'max_ibi': np.nanmax(data['ibi_ms']),
                     'min_ibi': np.nanmin(data['ibi_ms']),
-                    'ibi_mean_nt': np.nanmean(nt_data['ibi_ms']),
-                    'ibi_sd_nt': np.nanstd(nt_data['ibi_ms']),
-                    'max_ibi_nt': np.nanmax(nt_data['ibi_ms']),
-                    'min_ibi_nt': np.nanmin(nt_data['ibi_ms']),
-                    'ibi_mean_t': np.nanmean(t_data['ibi_ms']),
-                    'ibi_sd_t': np.nanstd(t_data['ibi_ms']),
-                    'max_ibi_t': np.nanmax(t_data['ibi_ms']),
-                    'min_ibi_t': np.nanmin(t_data['ibi_ms']),
+                    'ibi_mean_nt': np.nanmean(nt_data['ibi_ms']) if not nt_data.empty else np.nan,
+                    'ibi_sd_nt': np.nanstd(nt_data['ibi_ms']) if not nt_data.empty else np.nan,
+                    'max_ibi_nt': np.nanmax(nt_data['ibi_ms']) if not nt_data.empty else np.nan,
+                    'min_ibi_nt': np.nanmin(nt_data['ibi_ms']) if not nt_data.empty else np.nan,
+                    'ibi_mean_t': np.nanmean(t_data['ibi_ms']) if not t_data.empty else np.nan,
+                    'ibi_sd_t': np.nanstd(t_data['ibi_ms']) if not t_data.empty else np.nan,
+                    'max_ibi_t': np.nanmax(t_data['ibi_ms']) if not t_data.empty else np.nan,
+                    'min_ibi_t': np.nanmin(t_data['ibi_ms']) if not t_data.empty else np.nan,
                 }])
 
                 temp_log = temp_data if temp_log.empty else temp_log.merge(temp_data, how='outer')
