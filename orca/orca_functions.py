@@ -348,23 +348,23 @@ def check_timestamps(token, record_id):
 
     missing_timestamps = []
     #richards
-    if data.iloc[0,2] < 4 | data.iloc[1,2] < 4:
+    if data.iloc[0,2] < 4 or data.iloc[1,2] < 4:
         if pd.isna(timestamps.iloc[0, 2]) or pd.isna(timestamps.iloc[1, 2]):
             missing_timestamps.append('richards')
     #vpc
-    if data.iloc[3,2] < 4 | data.iloc[4,2] < 4:
+    if data.iloc[3,2] < 4 or data.iloc[4,2] < 4:
         if pd.isna(timestamps.iloc[2, 2]) or pd.isna(timestamps.iloc[3, 2]):
             missing_timestamps.append('vpc')
     #srt
-    if data.iloc[6,2] < 4 | data.iloc[7,2] < 4:
+    if data.iloc[6,2] < 4 or data.iloc[7,2] < 4:
         if pd.isna(timestamps.iloc[4, 2]) or pd.isna(timestamps.iloc[5, 2]):
             missing_timestamps.append('srt')
     #cecile
-    if data.iloc[9,2] < 4 | data.iloc[10,2] < 4:
+    if data.iloc[9,2] < 4 or data.iloc[10,2] < 4:
         if pd.isna(timestamps.iloc[6, 2]) or pd.isna(timestamps.iloc[7, 2]):
             missing_timestamps.append('cecile')
     #relational memory
-    if data.iloc[12,2] < 4 | data.iloc[13,2] < 4:
+    if data.iloc[12,2] < 4 or data.iloc[13,2] < 4:
         if pd.isna(timestamps.iloc[8, 2]) or pd.isna(timestamps.iloc[9, 2]):
             missing_timestamps.append('relational_memory')
     
@@ -376,7 +376,7 @@ def check_timestamps(token, record_id):
     toy = visit_notes['freeplay_conditions_4m___2'].iloc[0]
 
     #freeplay
-    if data.iloc[15,2] == 1 | data.iloc[16,2]:
+    if data.iloc[15,2] < 4 or data.iloc[16,2] < 4:
         if no_toy == 1 and toy == 1:
             if pd.isna(timestamps.iloc[10, 2]) or pd.isna(timestamps.iloc[11, 2]) or pd.isna(timestamps.iloc[12, 2]) or pd.isna(timestamps.iloc[13, 2]):
                 missing_timestamps.append('freeplay')
