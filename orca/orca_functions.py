@@ -206,10 +206,10 @@ def get_task_data(token, record_id = None, transposed = False):
     if record_id != None:
         visit_notes = visit_notes[visit_notes['record_id'] == record_id]
         visit_notes.reset_index(drop=True, inplace=True)
-        data_existence = visit_notes.loc[:,'richards_data_4m___cg_ecg':'freeplay_data_4m___video']
+        data_existence = visit_notes.loc[:,'richards_ecg_cg_data_4m':'fp_video_data_4m']
     else:
         record_ids = visit_notes['record_id']
-        data_existence1 = visit_notes.loc[:,'richards_data_4m___cg_ecg':'freeplay_data_4m___video']
+        data_existence1 = visit_notes.loc[:,'richards_ecg_cg_data_4m':'fp_video_data_4m']
         data_existence = pd.concat([record_ids, data_existence1], ignore_index=True)
         data_existence = data_existence.rename(columns={data_existence.columns[0]: 'record_id'})
 
