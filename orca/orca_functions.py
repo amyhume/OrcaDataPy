@@ -44,7 +44,8 @@ def get_all_data(token):
 #-----------------------
 
 #2-----------------------
-def get_orca_data(token, form, raw_v_label = 'raw', form_complete = True):
+
+def get_orca_data(token, form, raw_v_label = 'raw', timepoint = 'all',form_complete = True):
     """
     Retrieve any ORCA form from a REDCap project using the API.
 
@@ -52,6 +53,7 @@ def get_orca_data(token, form, raw_v_label = 'raw', form_complete = True):
         token (str): The API token for the project.
         form (str): The name of the REDCap form to retrieve data from.
         raw_v_label (str): The label for raw data fields (default is 'raw').
+        timepoint(str): The redcap event name for the event you wish to pull. Default is all
         form_complete (bool): Indicating whether to return all responses or just ones marked as complete (default is True).
 
     Returns:
@@ -75,7 +77,6 @@ def get_orca_data(token, form, raw_v_label = 'raw', form_complete = True):
     'csvDelimiter': '',
     'fields[0]': 'record_id',
     'forms[0]': form,
-    'events[0]': 'orca_4month_arm_1',
     'rawOrLabel': raw_v_label,
     'rawOrLabelHeaders': 'raw',
     'exportCheckboxLabel': 'false',
@@ -91,10 +92,12 @@ def get_orca_data(token, form, raw_v_label = 'raw', form_complete = True):
 
     if form_complete:
         record_filter = f"{form}_complete"
-        filtered_df = df[df[record_filter] == 2]
-        return filtered_df
-    else:
-        return df
+        df = df[df[record_filter] == 2]
+
+    if timepoint != 'all':
+        df = df[df['redcap_event_name'] == timepoint]
+    
+    return df
 #-----------------------
 
 #3-----------------------
@@ -140,8 +143,10 @@ def get_orca_field(token, field, raw_v_label = 'raw'):
     return df
 #-----------------------
 
+token = '25120FD84FFDA3B220617BDF23B680CD'
+record_id = '209'
 #4-----------------------
-def get_task_timestamps(token, record_id = None, transposed = False):
+def get_task_timestamps(token, record_id = None, transposed = False, timepoint = 'orca_4month_arm_1'):
     """
     Retrieve task timestamps for a particular ID in real time (EST).
 
@@ -149,6 +154,7 @@ def get_task_timestamps(token, record_id = None, transposed = False):
         token (str): The API token for the project.
         record_id (str): the record id you wish to pull (e.g. '218'). Default is 'none' and will pull the whole dataset
         transposed: Whether you want it in long format (for just one id) - default is False. Can only mark as True if you also specify a record id
+        timepoint (str): the redcap event name of the timepoint you wish to pull. Default is orca_4month_arm_1
 
     Returns:
         pandas.DataFrame: A DataFrame with the retrieved record id, task marker, timestamp in est.
@@ -157,36 +163,62 @@ def get_task_timestamps(token, record_id = None, transposed = False):
     import pandas as pd
     import io
     import pytz
+    if timepoint == 'orca_4month_arm_1':
+        visit_notes = get_orca_data(token, form = "visit_notes_4m", timepoint=timepoint,form_complete=False)
 
-    visit_notes = get_orca_data(token, form = "visit_notes_4m", form_complete=False)
+        if record_id != None:
+            visit_notes = visit_notes[visit_notes['record_id'] == record_id]
+            visit_notes.reset_index(drop=True, inplace=True)
+            visit_date = str(visit_notes['visit_date_4m'])
+            visit_date = visit_date.split()[1]
 
-    if record_id != None:
-        visit_notes = visit_notes[visit_notes['record_id'] == record_id]
-        visit_notes.reset_index(drop=True, inplace=True)
-        visit_date = str(visit_notes['visit_date_4m'])
-        visit_date = visit_date.split()[1]
+            markers = visit_notes[['richards_start_4m', 'richards_end_4m', 'vpc_start_4m', 'vpc_end_4m','srt_start_4m', 'srt_end_4m', 'cecile_start_4m', 'cecile_end_4m','relational_memory_start_4m', 'relational_memory_end_4m', 'notoy_start_real_4m','notoy_end_real_4m', 'toy_start_real_4m', 'toy_end_real_4m']]
+        else:
+            markers = visit_notes[['record_id', 'richards_start_4m', 'richards_end_4m', 'vpc_start_4m', 'vpc_end_4m','srt_start_4m', 'srt_end_4m', 'cecile_start_4m', 'cecile_end_4m','relational_memory_start_4m', 'relational_memory_end_4m', 'notoy_start_real_4m','notoy_end_real_4m', 'toy_start_real_4m', 'toy_end_real_4m']]
 
-        markers = visit_notes[['richards_start_4m', 'richards_end_4m', 'vpc_start_4m', 'vpc_end_4m','srt_start_4m', 'srt_end_4m', 'cecile_start_4m', 'cecile_end_4m','relational_memory_start_4m', 'relational_memory_end_4m', 'notoy_start_real_4m','notoy_end_real_4m', 'toy_start_real_4m', 'toy_end_real_4m']]
-    else:
-        markers = visit_notes[['record_id', 'richards_start_4m', 'richards_end_4m', 'vpc_start_4m', 'vpc_end_4m','srt_start_4m', 'srt_end_4m', 'cecile_start_4m', 'cecile_end_4m','relational_memory_start_4m', 'relational_memory_end_4m', 'notoy_start_real_4m','notoy_end_real_4m', 'toy_start_real_4m', 'toy_end_real_4m']]
+        if transposed == True and record_id != None:
+            markers = markers.transpose()
+            markers = markers.rename_axis('marker').reset_index()
+            markers.columns = ['marker', 'timestamp_est']
+            markers['record_id'] = record_id
+            markers['timestamp_est'] = pd.to_datetime(visit_date + ' ' + markers['timestamp_est'])
+            markers = markers[['record_id', 'marker', 'timestamp_est']]
+            markers['timestamp_est'] = markers['timestamp_est'].dt.tz_localize('America/New_York')  
 
-    if transposed == True and record_id != None:
-        markers = markers.transpose()
-        markers = markers.rename_axis('marker').reset_index()
-        markers.columns = ['marker', 'timestamp_est']
-        markers['record_id'] = record_id
-        markers['timestamp_est'] = pd.to_datetime(visit_date + ' ' + markers['timestamp_est'])
-        markers = markers[['record_id', 'marker', 'timestamp_est']]
-        markers['timestamp_est'] = markers['timestamp_est'].dt.tz_localize('America/New_York')  
+        elif transposed == True and record_id == None:
+            print('cannot transpose without selecting a record id')
+    
+    elif timepoint == 'orca_8month_arm_1':
+        visit_notes = get_orca_data(token, form="visit_notes_8m", timepoint=timepoint,form_complete=False)
+        visit_notes = visit_notes[visit_notes['redcap_event_name'] == 'orca_8month_arm_1']
 
-    elif transposed == True and record_id == None:
-        print('cannot transpose without selecting a record id')
+        if record_id != None:
+            visit_notes = visit_notes[visit_notes['record_id'] == record_id]
+            visit_notes.reset_index(drop=True, inplace=True)
+            visit_date = str(visit_notes['visit_date_8m'])
+            visit_date = visit_date.split()[1]
+
+            markers = visit_notes[['richards_start_8m', 'richards_end_8m', 'vpc_start_8m', 'vpc_end_8m','srt_start_8m', 'srt_end_8m', 'pa_start_8m', 'pa_end_8m','relational_memory_start_8m', 'relational_memory_end_8m','cecile_start_8m', 'cecile_end_8m', 'notoy_start_real_8m','notoy_end_real_8m', 'toy_start_real_8m', 'toy_end_real_8m']]
+        else:
+            markers = visit_notes[['record_id','richards_start_8m', 'richards_end_8m', 'vpc_start_8m', 'vpc_end_8m','srt_start_8m', 'srt_end_8m', 'pa_start_8m', 'pa_end_8m','relational_memory_start_8m', 'relational_memory_end_8m','cecile_start_8m', 'cecile_end_8m', 'notoy_start_real_8m','notoy_end_real_8m', 'toy_start_real_8m', 'toy_end_real_8m']]
+        
+        if transposed == True and record_id != None:
+            markers = markers.transpose()
+            markers = markers.rename_axis('marker').reset_index()
+            markers.columns = ['marker', 'timestamp_est']
+            markers['record_id'] = record_id
+            markers['timestamp_est'] = pd.to_datetime(visit_date + ' ' + markers['timestamp_est'])
+            markers = markers[['record_id', 'marker', 'timestamp_est']]
+            markers['timestamp_est'] = markers['timestamp_est'].dt.tz_localize('America/New_York')  
+
+        elif transposed == True and record_id == None:
+            print('cannot transpose without selecting a record id')
 
     return markers
 #-----------------------
 
 #5-----------------------
-def get_task_data(token, record_id = None, transposed = False):
+def get_task_data(token, record_id = None, transposed = False, timepoint='orca_4month_arm_1'):
     """
     Retrieve task data existence status for a particular ID/all ids.
 
@@ -194,24 +226,38 @@ def get_task_data(token, record_id = None, transposed = False):
         token (str): The API token for the project.
         record_id (str): the record id you wish to pull (e.g. '218'). Default is 'none' and will pull the whole dataset
         transposed: Whether you want it in long format (for just one id) - default is False. Can only mark as True if you also specify a record id
-
+        timepoint (str): the redcap event name of the timepoint you wish to pull. Default is orca_4month_arm_1
     Returns:
         pandas.DataFrame: A DataFrame with the retrieved record id, task marker, timestamp in est.
     """
     import requests
     import pandas as pd
     import io
-    visit_notes = get_orca_data(token, form = "visit_notes_4m", form_complete=False)
 
-    if record_id != None:
-        visit_notes = visit_notes[visit_notes['record_id'] == record_id]
-        visit_notes.reset_index(drop=True, inplace=True)
-        data_existence = visit_notes.loc[:,'richards_ecg_cg_data_4m':'fp_video_data_4m']
-    else:
-        record_ids = visit_notes['record_id']
-        data_existence1 = visit_notes.loc[:,'richards_ecg_cg_data_4m':'fp_video_data_4m']
-        data_existence = pd.concat([record_ids, data_existence1], ignore_index=True)
-        data_existence = data_existence.rename(columns={data_existence.columns[0]: 'record_id'})
+    if timepoint == 'orca_4month_arm_1':
+        visit_notes = get_orca_data(token, form = "visit_notes_4m", form_complete=False, timepoint=timepoint)
+
+        if record_id != None:
+            visit_notes = visit_notes[visit_notes['record_id'] == record_id]
+            visit_notes.reset_index(drop=True, inplace=True)
+            data_existence = visit_notes.loc[:,'richards_ecg_cg_data_4m':'fp_video_data_4m']
+        else:
+            record_ids = visit_notes['record_id']
+            data_existence1 = visit_notes.loc[:,'richards_ecg_cg_data_4m':'fp_video_data_4m']
+            data_existence = pd.concat([record_ids, data_existence1], ignore_index=True)
+            data_existence = data_existence.rename(columns={data_existence.columns[0]: 'record_id'})
+    elif timepoint == 'orca_8month_arm_1':
+        visit_notes = get_orca_data(token, form = "visit_notes_8m", form_complete=False, timepoint=timepoint)
+
+        if record_id != None:
+            visit_notes = visit_notes[visit_notes['record_id'] == record_id]
+            visit_notes.reset_index(drop=True, inplace=True)
+            data_existence = visit_notes.loc[:,'richards_ecg_cg_data_8m':'fp_video_data_8m']
+        else:
+            record_ids = visit_notes['record_id']
+            data_existence1 = visit_notes.loc[:,'richards_ecg_cg_data_8m':'fp_video_data_8m']
+            data_existence = pd.concat([record_ids, data_existence1], ignore_index=True)
+            data_existence = data_existence.rename(columns={data_existence.columns[0]: 'record_id'})
 
     if transposed == True and record_id != None:
         data_existence = data_existence.transpose()
@@ -226,7 +272,7 @@ def get_task_data(token, record_id = None, transposed = False):
 #-----------------------
 
 #6-----------------------
-def get_task_completion(token, record_id = None, transposed = False):
+def get_task_completion(token, record_id = None, transposed = False, timepoint='orca_4month_arm_1'):
     """
     Retrieve task data existence status for a particular ID/all ids.
 
@@ -234,23 +280,35 @@ def get_task_completion(token, record_id = None, transposed = False):
         token (str): The API token for the project.
         record_id (str): the record id you wish to pull (e.g. '218'). Default is 'none' and will pull the whole dataset
         transposed: Whether you want it in long format (for just one id) - default is False. Can only mark as True if you also specify a record id
-
+        timepoint (str): the redcap event name of the timepoint you wish to pull. Default is orca_4month_arm_1
     Returns:
         pandas.DataFrame: A DataFrame with the retrieved record id, task, completion status and reason why it's not fully complete.
     """
     import requests
     import pandas as pd
     import io
-    visit_notes = get_orca_data(token, form = "visit_notes_4m", form_complete=False)
 
-    if record_id != None:
-        visit_notes = visit_notes[visit_notes['record_id'] == record_id]
-        visit_notes.reset_index(drop=True, inplace=True)
-        task_comp = visit_notes[['richards_comp_4m', 'vpc_comp_4m', 'srt_comp_4m', 'cecile_comp_4m', 'relational_memory_comp_4m', 'freeplay_comp_4m']]
-        whys = visit_notes[['richards_why_4m', 'vpc_why_4m', 'srt_why_4m', 'cecile_why_4m', 'relational_memory_why_4m', 'freeplay_why_4m']]
-    else:
-        task_comp = visit_notes[['record_id','richards_comp_4m', 'richards_why_4m','vpc_comp_4m','vpc_why_4m', 'srt_comp_4m', 'srt_why_4m','cecile_comp_4m', 'cecile_why_4m','relational_memory_comp_4m', 'relational_memory_why_4m','freeplay_comp_4m', 'freeplay_why_4m']]
-    
+    if timepoint == 'orca_4month_arm_1':
+        visit_notes = get_orca_data(token, form = "visit_notes_4m", form_complete=False, timepoint=timepoint)
+
+        if record_id != None:
+            visit_notes = visit_notes[visit_notes['record_id'] == record_id]
+            visit_notes.reset_index(drop=True, inplace=True)
+            task_comp = visit_notes[['richards_comp_4m', 'vpc_comp_4m', 'srt_comp_4m', 'cecile_comp_4m', 'relational_memory_comp_4m', 'freeplay_comp_4m']]
+            whys = visit_notes[['richards_why_4m', 'vpc_why_4m', 'srt_why_4m', 'cecile_why_4m', 'relational_memory_why_4m', 'freeplay_why_4m']]
+        else:
+            task_comp = visit_notes[['record_id','richards_comp_4m', 'richards_why_4m','vpc_comp_4m','vpc_why_4m', 'srt_comp_4m', 'srt_why_4m','cecile_comp_4m', 'cecile_why_4m','relational_memory_comp_4m', 'relational_memory_why_4m','freeplay_comp_4m', 'freeplay_why_4m']]
+    elif timepoint == 'orca_8month_arm_1':
+        visit_notes = get_orca_data(token, form = "visit_notes_8m", form_complete=False, timepoint=timepoint)
+
+        if record_id != None:
+            visit_notes = visit_notes[visit_notes['record_id'] == record_id]
+            visit_notes.reset_index(drop=True, inplace=True)
+            task_comp = visit_notes[['richards_comp_8m', 'vpc_comp_8m', 'srt_comp_8m', 'pa_comp_8m','relational_memory_comp_8m', 'cecile_comp_8m', 'freeplay_comp_8m']]
+            whys = visit_notes[['richards_why_8m', 'vpc_why_8m', 'srt_why_8m', 'pa_why_8m','relational_memory_why_8m', 'cecile_why_8m', 'freeplay_why_8m']]
+        else:
+            task_comp = visit_notes[['record_id','richards_comp_8m', 'richards_why_8m','vpc_comp_8m','vpc_why_8m', 'srt_comp_8m', 'srt_why_8m','pa_comp_8m', 'pa_why_8m','relational_memory_comp_8m', 'relational_memory_why_8m','cecile_comp_8m', 'cecile_why_8m','freeplay_comp_8m', 'freeplay_why_8m']]
+
     if transposed == True and record_id != None:
         task_comp = task_comp.transpose()
         task_comp = task_comp.rename_axis('task').reset_index()
@@ -272,7 +330,7 @@ def get_task_completion(token, record_id = None, transposed = False):
 #-----------------------
 
 #7-----------------------
-def get_task_info(token, record_id = None, transposed = False):
+def get_task_info(token, record_id = None, transposed = False, timepoint='orca_4month_arm_1'):
     """
     Retrieves 3 data frames - task timestamps, completion status, and data presence for all ids or a particular id.
     Returns in order of: task_completion, task_data, task_timestamps
@@ -281,6 +339,7 @@ def get_task_info(token, record_id = None, transposed = False):
         token (str): The API token for the project.
         record_id (str): the record id you wish to pull (e.g. '218'). Default is 'none' and will pull the whole dataset
         transposed: Whether you want it in long format (for just one id) - default is False. Can only mark as True if you also specify a record id
+        timepoint (str): the redcap event name of the timepoint you wish to pull. Default is orca_4month_arm_1
 
     Returns:
         pandas.DataFrame: 3 DataFrames (runs get_task_completion, get_task_timestamps,get_task_data).
@@ -290,21 +349,22 @@ def get_task_info(token, record_id = None, transposed = False):
     import pandas as pd
     import io
 
-    task_completion = get_task_completion(token, record_id, transposed)
-    task_timestamps = get_task_timestamps(token, record_id, transposed)
-    task_data = get_task_data(token, record_id, transposed)
+    task_completion = get_task_completion(token, record_id, transposed, timepoint)
+    task_timestamps = get_task_timestamps(token, record_id, transposed, timepoint)
+    task_data = get_task_data(token, record_id, transposed, timepoint)
 
     return task_completion, task_data, task_timestamps
 #-----------------------
 
 #8-----------------------
-def get_movesense_numbers(token, record_id = None):
+def get_movesense_numbers(token, record_id = None, timepoint = 'orca_4month_arm_1'):
     """
-    Pulls child and caregiver movesense device numbers for 4 months.
+    Pulls child and caregiver movesense device numbers for a given timepoint.
 
     Args:
         token (str): The API token for the project.
         record_id (str): the record id you wish to pull (e.g. '218'). Default is 'none' and will pull the whole dataset
+        timepoint (str): the redcap event name of the timepoint you wish to pull. Default is orca_4month_arm_1
 
     Returns:
         pandas.DataFrame: A DataFrame with record id, child device number and caregiver device number. If a single record id is specified, will return cg device number first, then child
@@ -313,29 +373,38 @@ def get_movesense_numbers(token, record_id = None):
     import requests
     import pandas as pd
     import io
-    visit_notes = get_orca_data(token, form = "visit_notes_4m", form_complete=False)
+    import numpy as np
+
+    form_name = "visit_notes_" + timepoint[5:7]
+    visit_notes = get_orca_data(token, form=form_name, form_complete=False, timepoint=timepoint)
+    child_column_name = [col for col in visit_notes.columns if 'hr_device_child' in col][0]
+    parent_column_name = [col for col in visit_notes.columns if 'hr_device_cg' in col][0]
 
     if record_id != None:
         visit_notes = visit_notes[visit_notes['record_id'] == record_id]
         visit_notes.reset_index(drop=True, inplace=True)
-        child_number = str(int(visit_notes['hr_device_child_4m']))
-        parent_number = str(int(visit_notes['hr_device_cg_4m']))
+        child_number = str(int(visit_notes[child_column_name])) if not visit_notes[child_column_name].empty else np.nan
+        parent_number = str(int(visit_notes[parent_column_name])) if not visit_notes[parent_column_name].empty else np.nan
         return parent_number, child_number
     else:
-        visit_notes = visit_notes[['record_id', 'hr_device_cg_4m', 'hr_device_child_4m']]
-        visit_notes['hr_device_cg_4m'] = visit_notes['hr_device_cg_4m'].astype('Int64')
-        visit_notes['hr_device_child_4m'] = visit_notes['hr_device_child_4m'].astype('Int64')
+        visit_notes = visit_notes[['record_id', parent_column_name, child_column_name]]
+        visit_notes[parent_column_name] = visit_notes[parent_column_name].astype('Int64')
+        visit_notes[child_column_name] = visit_notes[child_column_name].astype('Int64')
         return visit_notes
+
 #-----------------------
 
 #9-----------------------
-def check_timestamps(token, record_id):
+record_id = '209'
+timepoint = 'orca_4month_arm_1'
+def check_timestamps(token, record_id, timepoint='orca_4month_arm_1'):
     """
     Pulls task info, and checks to see if there's any incorrectly missing timestamps.
 
     Args:
         token (str): The API token for the project.
         record_id (str): the record id you wish to pull (e.g. '218')
+        timepoint (str): the redcap event name of the timepoint you wish to pull. Default is orca_4month_arm_1
 
     Returns:
         pandas.DataFrame: A character vector with the tasks that have incorrect/missing timestamps
@@ -344,7 +413,7 @@ def check_timestamps(token, record_id):
     import requests
     import pandas as pd
     import io
-    comp, data, timestamps = get_task_info(token, record_id=record_id, transposed=True)
+    comp, data, timestamps = get_task_info(token, record_id=record_id, transposed=True, timepoint=timepoint)
 
     missing_timestamps = []
     #richards
@@ -391,7 +460,7 @@ def check_timestamps(token, record_id):
 #-----------------------
 
 #10-----------------------
-def get_movesense_times(token, record_id, who):
+def get_movesense_times(token, record_id, who, timepoint='orca_4month_arm_1'):
     """
     Pulls test recording times for each movesense device in order parent, child.
 
@@ -399,6 +468,7 @@ def get_movesense_times(token, record_id, who):
         token (str): The API token for the project.
         record_id (str): the record id you wish to pull (e.g. '218')
         who (str): 'cg' or 'child' 
+        timepoint (str): the redcap event name of the timepoint you wish to pull. Default is orca_4month_arm_1
 
     Returns:
         a character vector with the on time followed by off time
@@ -411,18 +481,24 @@ def get_movesense_times(token, record_id, who):
     import numpy as np
     import pytz
 
-    visit_notes = get_orca_data(token, form = "visit_notes_4m", form_complete=False)
-    movesense_times = visit_notes[['record_id', 'cg_movesense_on_4m',"child_movesense_on_4m", "cg_movesense_off_4m", "child_movesense_off_4m"]]
+    form_name = "visit_notes_" + timepoint[5:7]
+    visit_notes = get_orca_data(token, form=form_name, form_complete=False, timepoint=timepoint)
+    child_on = [col for col in visit_notes.columns if 'child_movesense_on' in col][0]
+    child_off = [col for col in visit_notes.columns if 'child_movesense_off' in col][0]
+    parent_on = [col for col in visit_notes.columns if 'cg_movesense_on' in col][0]
+    parent_off = [col for col in visit_notes.columns if 'cg_movesense_off' in col][0]
+
+    movesense_times = visit_notes[['record_id', parent_on,child_on, parent_off, child_off]]
     movesense_times = movesense_times[movesense_times['record_id'] == record_id]
 
-    date = get_orca_field(token, field = 'visit_date_4m')
+    date = get_orca_field(token, field = "visit_date_"+timepoint[5:7])
     date = date[date['record_id'] == record_id]
-    date = str(date['visit_date_4m'])
+    date = str(date["visit_date_"+timepoint[5:7]])
     date = date.split()[1]
 
     if who == 'cg':
-        on_time = str(movesense_times['cg_movesense_on_4m']).split()[1]
-        off_time = str(movesense_times['cg_movesense_off_4m']).split()[1]
+        on_time = str(movesense_times[parent_on]).split()[1]
+        off_time = str(movesense_times[parent_off]).split()[1]
         if on_time != 'NaN' and off_time != 'NaN':
             on_time = pd.to_datetime(date+ ' ' + on_time)
             off_time = pd.to_datetime(date+ ' ' + off_time)
@@ -432,8 +508,8 @@ def get_movesense_times(token, record_id, who):
             off_time = pd.to_datetime(date+ ' ' + off_time)
         
     elif who == 'child':
-        on_time = str(movesense_times['child_movesense_on_4m']).split()[1]
-        off_time = str(movesense_times['child_movesense_off_4m']).split()[1]
+        on_time = str(movesense_times[child_on]).split()[1]
+        off_time = str(movesense_times[child_off]).split()[1]
         if on_time != 'NaN' and off_time != 'NaN':
             on_time = pd.to_datetime(date+ ' ' + on_time)
             off_time = pd.to_datetime(date+ ' ' + off_time)
@@ -449,7 +525,7 @@ def get_movesense_times(token, record_id, who):
 #-----------------------
 
 #11-----------------------
-def get_visit_datetime(token, record_id = None, merged = True):
+def get_visit_datetime(token, record_id = None, merged = True, timepoint = 'orca_4month_arm_1'):
     """
     Pulls the visit start date time for all ids / a specified ID
 
@@ -457,6 +533,7 @@ def get_visit_datetime(token, record_id = None, merged = True):
         token (str): The API token for the project.
         record_id (str): record_id you want to specify. Default is None and will pull all IDs
         merged (bool): Whether to return the merged datetime or date and time as separate columns. Default is True
+        timepoint (str): the redcap event name of the timepoint you wish to pull. Default is orca_4month_arm_1
 
     Returns:
         pandas.DataFrame: if record_id = None or merged = False containing record_id, date, time, datetime
@@ -468,28 +545,53 @@ def get_visit_datetime(token, record_id = None, merged = True):
     from datetime import datetime
     import pytz
 
-    visit_notes = get_orca_data(token, form = "visit_notes_4m", form_complete=False)
-    data = visit_notes[['record_id', 'visit_date_4m', 'visit_time_4m']]
-    data = data[data['visit_date_4m'].notna() | data['visit_time_4m'].notna()]
+    if timepoint == 'orca_4month_arm_1':
+        visit_notes = get_orca_data(token, form = "visit_notes_4m", form_complete=False, timepoint=timepoint)
+        data = visit_notes[['record_id', 'visit_date_4m', 'visit_time_4m']]
+        data = data[data['visit_date_4m'].notna() | data['visit_time_4m'].notna()]
 
-    data['visit_date_4m'] = pd.to_datetime(data['visit_date_4m'])
-    data['visit_time_4m'] = pd.to_datetime(data['visit_time_4m'], format='%H:%M').dt.time
+        data['visit_date_4m'] = pd.to_datetime(data['visit_date_4m'])
+        data['visit_time_4m'] = pd.to_datetime(data['visit_time_4m'], format='%H:%M').dt.time
 
-    if record_id == None and merged == False:
-        return data
-    elif record_id == None and merged == True:
-        data['visit_datetime_4m'] = data['visit_date_4m'] + pd.to_timedelta(data['visit_time_4m'].astype(str))
-        data['visit_datetime_4m'] = data['visit_datetime_4m'].dt.tz_localize('America/New_York')
-        return data
-    elif record_id != None and merged == False:
-        data = data[data['record_id'] == record_id]
-        return data
-    elif record_id != None and merged == True:
-        data = data[data['record_id'] == record_id]
-        data['visit_datetime_4m'] = data['visit_date_4m'] + pd.to_timedelta(data['visit_time_4m'].astype(str))
-        data['visit_datetime_4m'] = data['visit_datetime_4m'].dt.tz_localize('America/New_York')
-        value = data['visit_datetime_4m'].iloc[0]
-        return value
+        if record_id == None and merged == False:
+            return data
+        elif record_id == None and merged == True:
+            data['visit_datetime_4m'] = data['visit_date_4m'] + pd.to_timedelta(data['visit_time_4m'].astype(str))
+            data['visit_datetime_4m'] = data['visit_datetime_4m'].dt.tz_localize('America/New_York')
+            return data
+        elif record_id != None and merged == False:
+            data = data[data['record_id'] == record_id]
+            return data
+        elif record_id != None and merged == True:
+            data = data[data['record_id'] == record_id]
+            data['visit_datetime_4m'] = data['visit_date_4m'] + pd.to_timedelta(data['visit_time_4m'].astype(str))
+            data['visit_datetime_4m'] = data['visit_datetime_4m'].dt.tz_localize('America/New_York')
+            value = data['visit_datetime_4m'].iloc[0]
+            return value
+        
+    elif timepoint == 'orca_8month_arm_1':
+        visit_notes = get_orca_data(token, form = "visit_notes_8m", form_complete=False, timepoint=timepoint)
+        data = visit_notes[['record_id', 'visit_date_8m', 'visit_time_8m']]
+        data = data[data['visit_date_8m'].notna() | data['visit_time_8m'].notna()]
+
+        data['visit_date_8m'] = pd.to_datetime(data['visit_date_8m'])
+        data['visit_time_8m'] = pd.to_datetime(data['visit_time_8m'], format='%H:%M').dt.time
+
+        if record_id == None and merged == False:
+            return data
+        elif record_id == None and merged == True:
+            data['visit_datetime_8m'] = data['visit_date_8m'] + pd.to_timedelta(data['visit_time_8m'].astype(str))
+            data['visit_datetime_8m'] = data['visit_datetime_8m'].dt.tz_localize('America/New_York')
+            return data
+        elif record_id != None and merged == False:
+            data = data[data['record_id'] == record_id]
+            return data
+        elif record_id != None and merged == True:
+            data = data[data['record_id'] == record_id]
+            data['visit_datetime_8m'] = data['visit_date_8m'] + pd.to_timedelta(data['visit_time_8m'].astype(str))
+            data['visit_datetime_8m'] = data['visit_datetime_8m'].dt.tz_localize('America/New_York')
+            value = data['visit_datetime_8m'].iloc[0]
+            return value
 #-----------------------
 
 #12-----------------------
@@ -772,7 +874,7 @@ def extract_ibi(file,method='interpolated'):
 
     Args:
         file (str): A file path of your matlab file
-        method(str): whether you want to pull raw data or interpolated. raw has noise REMOVED and interpolated has noise interpolated
+        method(str): 'interpolated' or 'raw',whether you want to pull raw data or interpolated. raw has noise REMOVED and interpolated has noise interpolated
 
     Returns:
         data (pandas.DataFrame): data frame with time_s and time_ms of beat times, ibi in ms, and differenced IBIs 
