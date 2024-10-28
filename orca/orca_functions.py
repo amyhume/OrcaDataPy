@@ -1172,7 +1172,7 @@ def clean_video_times(file, id, timepoint = 4):
         times_data = times_data.set_index('Video2').T
 
         times_data['record_id'] = id
-        times_data['redcap_event_name'] = 'orca_4month_arm_1' if timepoint == '4 Months' else 'orca_8month_arm_1'
+        times_data['redcap_event_name'] = 'orca_4month_arm_1' if timepoint == 4 else 'orca_8month_arm_1'
 
         print("\n")
         print('Video times data prepared for redcap import. check before importing')
