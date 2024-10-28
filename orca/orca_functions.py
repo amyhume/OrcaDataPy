@@ -1126,3 +1126,99 @@ def create_epochs(data, size=3, time_column = 'time_s', value_column='ibi_ms', c
 
 
     return(epoched_data)
+#-----------------------
+
+#OWLET SPECIFIC FUNCTIONS
+
+#9-----------------------
+def clean_video_times(file, id, timepoint = 4):
+    """
+    Reads video times csv from OWLET, converts to eastern time and formats into redcap-compatible format for data import
+
+    Args:
+        file (str): The file path for video times csv
+        id (str): the record if you are processing (e.g. '319')
+        timepoint (int): the numeric value for the timepoint you are processing (default = 4)
+    Returns:
+        times_data (pandas.DataFrame): Df containing record_id, redcap_event_name, and timestamp for start and end of each video in timepoint
+    """
+    import os
+    import pandas as pd
+    import pytz
+    from datetime import timedelta
+    import numpy as np
+
+    #reading csv
+    times_csv = pd.read_csv(file)
+    times_data = times_csv.melt(id_vars=['data:text/csv;charset=utf-8'], var_name='Video', value_name='Time')
+    times_data['Video2'] = times_data['Video'] + "_" + times_data.iloc[:, 0]
+
+    #renaming to redcap field names
+    times_data['Video2'] = times_data['Video2'].str.replace('Video1', 'richards').str.replace('Video2', 'vpc').str.replace('Video3', 'srt').str.replace('Video4', 'cecile').str.replace('Video5', 'relational_memory')
+    times_data['Video2'] = times_data['Video2'].str.replace('Start', 'start_4m').str.replace('End', 'end_4m')
+
+    times_data['Time'] = pd.to_datetime(times_data['Time']).dt.tz_localize('UTC')
+    times_data['Time'] = times_data['Time'].dt.tz_convert('America/New_York').dt.strftime('%H:%M:%S')
+    times_data['Time']
+
+    display(times_data)
+    user_response = input("Check the times in the displayed dataset. Enter 'N' to terminate or 'Y' to continue: ") 
+
+    if user_response.lower() == 'n':
+        print("\n")
+        print('Process aborted. Try again')
+    elif user_response.lower() == 'y':
+        times_data = times_data[['Video2', 'Time']]
+        times_data = times_data.set_index('Video2').T
+
+        times_data['record_id'] = id
+        times_data['redcap_event_name'] = 'orca_4month_arm_1' if timepoint == '4 Months' else 'orca_8month_arm_1'
+
+        print("\n")
+        print('Video times data prepared for redcap import. check before importing')
+
+        return times_data
+#-----------------------
+
+#10-----------------------
+def clean_survey_data(file, timepoint=4):
+    """
+    Reads survey data csv from OWLET, and formats into redcap-compatible format for data import
+
+    Args:
+        file (str): The file path for video times csv
+        timepoint (int): the numeric value for the timepoint you are processing (default = 4)
+    Returns:
+        survey_data (pandas.DataFrame): Df containing record_id, redcap_event_name, and survey data fields
+    """
+        
+    import os
+    import pandas as pd
+    import pytz
+    from datetime import timedelta
+    import numpy as np
+
+    survey_data = pd.read_csv(file)
+
+    if 'orca' not in survey_data['subject_id'][0]:
+        survey_data['empty_column'] = ''
+        survey_data = survey_data.shift(axis=1)
+        survey_data.iloc[:, 0] = survey_data.index
+        survey_data.reset_index(drop=True, inplace=True)
+
+        survey_data['feedback'] = survey_data['feedback'] + survey_data['empty_column']
+
+    survey_data.rename(columns={
+    'subject_id': 'record_id',
+    'feedback': 'owlet_feedback'
+    }, inplace=True)
+
+    survey_data['redcap_event_name'] = 'orca_4month_arm_1'
+    survey_data = survey_data[['record_id', 'redcap_event_name', 'internet_connection','instructions_ease','website_ease','owlet_feedback']]
+    survey_data['record_id'] = survey_data['record_id'].str.replace('orca_', '')
+
+    return survey_data
+#-----------------------
+
+#11-----------------------
+#-----------------------
