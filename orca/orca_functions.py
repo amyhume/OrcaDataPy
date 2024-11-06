@@ -1131,7 +1131,7 @@ def create_epochs(data, size=3, time_column = 'time_s', value_column='ibi_ms', c
 #OWLET SPECIFIC FUNCTIONS
 
 #9-----------------------
-def clean_video_times(file, id, timepoint = 4):
+def clean_video_times(file, id, visit_date, timepoint = 4):
     """
     Reads video times csv from OWLET, converts to eastern time and formats into redcap-compatible format for data import
 
@@ -1157,7 +1157,7 @@ def clean_video_times(file, id, timepoint = 4):
     times_data['Video2'] = times_data['Video2'].str.replace('Video1', 'richards').str.replace('Video2', 'vpc').str.replace('Video3', 'srt').str.replace('Video4', 'cecile').str.replace('Video5', 'relational_memory')
     times_data['Video2'] = times_data['Video2'].str.replace('Start', 'start_4m').str.replace('End', 'end_4m')
 
-    times_data['Time'] = pd.to_datetime(times_data['Time']).dt.tz_localize('UTC')
+    times_data['Time'] = pd.to_datetime(visit_date + ' ' + times_data['Time'], utc=True)
     times_data['Time'] = times_data['Time'].dt.tz_convert('America/New_York').dt.strftime('%H:%M:%S')
     times_data['Time']
 
