@@ -1131,7 +1131,7 @@ def create_epochs(data, size=3, time_column = 'time_s', value_column='ibi_ms', c
 #OWLET SPECIFIC FUNCTIONS
 
 #9-----------------------
-def clean_video_times(file, id, timepoint = 4):
+def clean_video_times(file, id, visit_date, timepoint = 4):
     """
     Reads video times csv from OWLET, converts to eastern time and formats into redcap-compatible format for data import
 
@@ -1157,7 +1157,7 @@ def clean_video_times(file, id, timepoint = 4):
     times_data['Video2'] = times_data['Video2'].str.replace('Video1', 'richards').str.replace('Video2', 'vpc').str.replace('Video3', 'srt').str.replace('Video4', 'cecile').str.replace('Video5', 'relational_memory')
     times_data['Video2'] = times_data['Video2'].str.replace('Start', 'start_4m').str.replace('End', 'end_4m')
 
-    times_data['Time'] = pd.to_datetime(times_data['Time']).dt.tz_localize('UTC')
+    times_data['Time'] = pd.to_datetime(visit_date + ' ' + times_data['Time'], utc=True)
     times_data['Time'] = times_data['Time'].dt.tz_convert('America/New_York').dt.strftime('%H:%M:%S')
     times_data['Time']
 
@@ -1172,7 +1172,7 @@ def clean_video_times(file, id, timepoint = 4):
         times_data = times_data.set_index('Video2').T
 
         times_data['record_id'] = id
-        times_data['redcap_event_name'] = 'orca_4month_arm_1' if timepoint == '4 Months' else 'orca_8month_arm_1'
+        times_data['redcap_event_name'] = 'orca_4month_arm_1' if timepoint == 4 else 'orca_8month_arm_1'
 
         print("\n")
         print('Video times data prepared for redcap import. check before importing')
@@ -1221,4 +1221,99 @@ def clean_survey_data(file, timepoint=4):
 #-----------------------
 
 #11-----------------------
+def overlay_real_time(video_path,output_path, start_time):
+    """
+    Reads an mp4 file, and uses frame rate and start date time to overlay real time for each frame, and saves it to output path
+
+    Args:
+        video_path (str): The file path for mp4
+        output_path (str): The file path to save the new mp4
+        start_time (datetime): Real start datetime for the mp4. Must be in format '%Y-%m-%d %H:%M:%S.%f'. If it is in str, function will convert to datetime
+    Returns:
+        Success / error message: Success message if mp4 is successfully saved
+    """
+        
+    import cv2
+    import pandas as pd
+    from datetime import datetime, timedelta
+
+    #Step 1: Try to load video
+    print('loading video...')
+    cap = cv2.VideoCapture(video_path)
+
+    if cap.isOpened():
+        print('Video file successfully opened')
+    elif not cap.isOpened():
+        return "Error: could not open video file. Please check the video path"
+    
+    
+    #Step 2: Calculate frame rate
+    print('calculating frame rate...')
+    fps = cap.get(cv2.CAP_PROP_FPS)
+
+    if fps != 0:
+        print('Frame rate calculated: ', fps)
+    else:
+        return('Error: could not calculate frame rate. Process terminated')
+
+    #Step 3: Specify output and verify dimensions
+    try:
+        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+        width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+        height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
+    except Exception as e:
+        return f"Error: could not initialize the video writer. {e}"
+    
+    # Convert start_time if it's in string format
+    if isinstance(start_time, str):
+        try:
+            start_time = datetime.strptime(start_time, "%Y-%m-%d %H:%M:%S.%f")
+        except ValueError:
+            return "Error: Start time format should be 'YYYY-mm-dd HH:MM:SS.ms'."
+
+    #Step 4: Process Frames
+    print('processing frame timestamps')
+    try:
+        while cap.isOpened():
+            ret, frame = cap.read()
+            if not ret:
+                break
+        
+            #calculate the current timestamp based on frame position
+            frame_index = int(cap.get(cv2.CAP_PROP_POS_FRAMES))
+            current_time = device_on_start + timedelta(seconds=frame_index / fps)
+
+            #format timestamp and overlay on video frame
+            timestamp_str = current_time.strftime("%H:%M:%S.%f")[:-3]  # Shows to milliseconds
+            cv2.putText(frame, timestamp_str, (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2, cv2.LINE_AA)
+
+
+            #write the frame
+            out.write(frame)
+
+    except Exception as e:
+        return f"Error: an error occurred while processing frames. {e}"
+
+    # Step 5: Release resources and return success message
+    try:
+        out.release()
+        cap.release()
+        cv2.destroyAllWindows()
+    except Exception as e:
+        return f"Error: Failed to release resources properly. {e}"
+    
+    return f"Video processing complete! Saved output to {output_path}"
+#-----------------------
+
+#12-----------------------
+
+#-----------------------
+
+#13-----------------------
+
+#-----------------------
+
+#14-----------------------
+
 #-----------------------
