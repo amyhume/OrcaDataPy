@@ -1181,13 +1181,14 @@ def clean_video_times(file, id, visit_date, timepoint = 4):
 #-----------------------
 
 #10-----------------------
-def clean_survey_data(file, timepoint=4):
+def clean_survey_data(file, timepoint='4', study='orca'):
     """
     Reads survey data csv from OWLET, and formats into redcap-compatible format for data import
 
     Args:
         file (str): The file path for video times csv
-        timepoint (int): the numeric value for the timepoint you are processing (default = 4)
+        timepoint (str): the numeric value for the timepoint you are processing (default = 4)
+        study (str): study code, default is orca. Change to 'mice_baseline' or 
     Returns:
         survey_data (pandas.DataFrame): Df containing record_id, redcap_event_name, and survey data fields
     """
@@ -1200,22 +1201,28 @@ def clean_survey_data(file, timepoint=4):
 
     survey_data = pd.read_csv(file)
 
-    if 'orca' not in survey_data['subject_id'][0]:
-        survey_data['empty_column'] = ''
-        survey_data = survey_data.shift(axis=1)
-        survey_data.iloc[:, 0] = survey_data.index
-        survey_data.reset_index(drop=True, inplace=True)
+    if study == 'orca':
+        if 'orca' not in survey_data['subject_id'][0]:
+            survey_data['empty_column'] = ''
+            survey_data = survey_data.shift(axis=1)
+            survey_data.iloc[:, 0] = survey_data.index
+            survey_data.reset_index(drop=True, inplace=True)
 
-        survey_data['feedback'] = survey_data['feedback'] + survey_data['empty_column']
+            survey_data['feedback'] = survey_data['feedback'] + survey_data['empty_column']
 
     survey_data.rename(columns={
     'subject_id': 'record_id',
     'feedback': 'owlet_feedback'
     }, inplace=True)
 
-    survey_data['redcap_event_name'] = 'orca_4month_arm_1'
-    survey_data = survey_data[['record_id', 'redcap_event_name', 'internet_connection','instructions_ease','website_ease','owlet_feedback']]
-    survey_data['record_id'] = survey_data['record_id'].str.replace('orca_', '')
+    if study == 'orca':
+        survey_data['redcap_event_name'] = 'orca_' + timepoint + 'month_arm_1'
+        survey_data = survey_data[['record_id', 'redcap_event_name', 'internet_connection','instructions_ease','website_ease','owlet_feedback']]
+        survey_data['record_id'] = survey_data['record_id'].str.replace('orca_', '')
+    elif study == 'mice_baseline':
+        survey_data['redcap_event_name'] = 'mb_surveys_arm_3'
+        survey_data = survey_data[['record_id', 'redcap_event_name', 'internet_connection','instructions_ease','website_ease','owlet_feedback']]
+        survey_data['record_id'] = survey_data['record_id'].str.replace('vpc_', 'mb_')
 
     return survey_data
 #-----------------------
