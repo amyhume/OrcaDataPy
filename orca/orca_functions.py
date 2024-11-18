@@ -1313,8 +1313,28 @@ def overlay_real_time(video_path,output_path, start_time):
     return f"Video processing complete! Saved output to {output_path}"
 #-----------------------
 
-#12-----------------------
+#12----------------------- #pulls PEACH ema data
+def get_ema_data(token, am_or_pm = 'am'):
+    """
+    Pulls PEACH am or pm ema survey averages for each event and domain
 
+    Args:
+        token (str): The API token for the PEACH redcap project. 
+        am_or_pm (str): whether you want to pull daytime or evening surveys. default is am
+
+    Returns:
+        pandas.DataFrame: A DataFrame with the retrieved data.
+    """
+    if am_or_pm == 'am':
+        ema = get_orca_data(token, form='ema_am_survey')
+        ema = ema[ema['record_id'].str.contains('pch')]
+        ema = ema[['record_id', 'redcap_event_name', 'anxiety_am', 'attention_am', 'stress_am', 'depression_am', 'loneliness_am']]
+    elif am_or_pm == 'pm':
+        ema = get_orca_data(token, form='ema_pm_survey')
+        ema = ema[ema['record_id'].str.contains('pch')]
+        ema = ema[['record_id', 'redcap_event_name', 'anxiety_pm', 'attention_pm', 'stress_pm', 'depression_pm']]
+
+    return ema
 #-----------------------
 
 #13-----------------------
