@@ -1332,7 +1332,7 @@ def get_ema_data(token, am_or_pm = 'am'):
     elif am_or_pm == 'pm':
         ema = get_orca_data(token, form='ema_pm_survey')
         ema = ema[ema['record_id'].str.contains('pch')]
-        ema = ema[['record_id', 'redcap_event_name', 'ema_am_survey_timestamp', 'anxiety_pm', 'attention_pm', 'stress_pm', 'depression_pm']]
+        ema = ema[['record_id', 'redcap_event_name', 'ema_pm_survey_timestamp', 'anxiety_pm', 'attention_pm', 'stress_pm', 'depression_pm']]
 
     return ema
 #-----------------------
