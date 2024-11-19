@@ -1328,17 +1328,172 @@ def get_ema_data(token, am_or_pm = 'am'):
     if am_or_pm == 'am':
         ema = get_orca_data(token, form='ema_am_survey')
         ema = ema[ema['record_id'].str.contains('pch')]
-        ema = ema[['record_id', 'redcap_event_name', 'anxiety_am', 'attention_am', 'stress_am', 'depression_am', 'loneliness_am']]
+        ema = ema[['record_id', 'redcap_event_name', 'ema_am_survey_timestamp', 'anxiety_am', 'attention_am', 'stress_am', 'depression_am', 'loneliness_am']]
+        ema.rename(columns={'ema_am_survey_timestamp': 'ema_survey_timestamp', 'redcap_event_name': 'ema_survey'}, inplace=True)
     elif am_or_pm == 'pm':
         ema = get_orca_data(token, form='ema_pm_survey')
         ema = ema[ema['record_id'].str.contains('pch')]
-        ema = ema[['record_id', 'redcap_event_name', 'anxiety_pm', 'attention_pm', 'stress_pm', 'depression_pm']]
+        ema = ema[['record_id', 'redcap_event_name', 'ema_pm_survey_timestamp', 'anxiety_pm', 'attention_pm', 'stress_pm', 'depression_pm']]
+        ema.rename(columns={'ema_pm_survey_timestamp': 'ema_survey_timestamp', 'redcap_event_name': 'ema_survey'}, inplace=True)
+
+    ema['ema_survey'] = ema['ema_survey'].str.replace('_arm_1', '_'+am_or_pm, regex=False)
+    ema['ema_survey'] = ema['ema_survey'].str.replace('eek_', '')
 
     return ema
 #-----------------------
 
 #13-----------------------
+def peach_ema_data_pull(token, data_type=None):
+    """
+    Pulls peach daily data checks for ema surveys
 
+    Args:
+        token (str): The API token for the PEACH redcap project. 
+        data_type (str): if you just want to pull one data type. Default is None and pulls all (survey_info, am_mean_data, pm_mean_data, max_data, last_data)
+
+    Returns:
+        pandas.DataFrame: 1 or 5 dataframes (survey_info, am_mean_data, pm_mean_data, max_data, last_data)
+    """
+    import pandas as pd
+    import numpy as np
+
+    #pulling all survey timetables
+    survey_timetable = get_orca_data(token, form='survey_timetable', form_complete=False)
+
+    #pulling domain scores for each week
+    ema_am_domains = get_ema_data(token, am_or_pm='am')
+    ema_pm_domains = get_ema_data(token, am_or_pm='pm')
+
+    #creating list of ids to iterate through
+    unique_ids = ema_am_domains['record_id'].unique()
+
+    #creating empty dfs
+    survey_info = pd.DataFrame(columns=['record_id','todays_date','last_survey','last_survey_date','next_survey','days_enrolled','surveys_complete_perc','missed_surveys_flag'])
+    am_mean_data = pd.DataFrame(columns=['record_id','anxiety_mean','anxiety_sd','attention_mean','attention_sd','stress_mean','stress_sd','depression_mean','depression_sd','loneliness_mean','loneliness_sd'])
+    pm_mean_data = pd.DataFrame(columns=['record_id','anxiety_mean','anxiety_sd','attention_mean','attention_sd','stress_mean','stress_sd','depression_mean','depression_sd'])
+    last_data = pd.DataFrame(columns=['record_id', 'last_survey_date', 'last_survey', 'anxiety_last','attention_last', 'stress_last', 'depression_last', 'loneliness_last'])
+    max_data = pd.DataFrame(columns=['record_id', 'anxiety_max_am', 'anxiety_max_pm', 'attention_max_am','attention_max_pm', 'stress_max_am', 'stress_max_pm','depression_max_am', 'depression_max_pm', 'loneliness_max_am'])
+
+
+    for id in unique_ids:
+        id_data_am = ema_am_domains[ema_am_domains['record_id'] == id].copy().reset_index(drop=True)
+        id_data_pm = ema_pm_domains[ema_pm_domains['record_id'] == id].copy().reset_index(drop=True)
+        id_data = pd.concat([id_data_am, id_data_pm], axis=0, join='outer')
+        id_data = id_data.sort_values(by='ema_survey_timestamp').reset_index(drop=True)
+
+        #cleaning survey timetable
+        id_timetable = survey_timetable[(survey_timetable['record_id'] == id) & (survey_timetable['redcap_event_name'] == 'initial_data_arm_1')].copy().reset_index(drop=True)
+        id_timetable = id_timetable.transpose()
+        id_timetable = id_timetable.rename_axis('survey_name').reset_index()    
+        id_timetable.columns = ['survey_name', 'survey_send_time']
+        id_timetable = id_timetable.drop(id_timetable.index[0:12]).reset_index(drop=True)
+        id_timetable = id_timetable[id_timetable['survey_name'] != 'survey_timetable_complete']
+        id_timetable['survey_send_time'] = pd.to_datetime(id_timetable['survey_send_time'])
+        id_timetable['survey_name'] = id_timetable['survey_name'].str.replace('_send', '', regex=False)
+
+        #finding survey completion stats 
+        last_survey_date = max(id_data['ema_survey_timestamp'])
+        last_survey_name = id_data['ema_survey'].iloc[id_data['ema_survey_timestamp'].idxmax()]
+        last_survey_am_pm = 'am' if '_am' in last_survey_name else 'pm'
+
+        #next survey in queue
+        current_dt = pd.to_datetime('today')
+        future_surveys = id_timetable[id_timetable['survey_send_time'] > current_dt].reset_index(drop=True)
+        next_survey_name = future_surveys['survey_name'].iloc[future_surveys['survey_send_time'].idxmin()]
+
+        #% surveys complete / missing data 
+        past_surveys = id_timetable[id_timetable['survey_send_time'] < current_dt].reset_index(drop=True)
+        past_surveys['survey_complete'] = np.nan
+
+        for i, survey in enumerate(past_surveys['survey_name']):
+            past_surveys.loc[i, 'survey_complete'] = 1 if survey in id_data['ema_survey'].values else 0
+
+        surveys_complete_perc = sum(past_surveys['survey_complete'].values) / len(past_surveys) * 100
+        surveys_missed_perc = (past_surveys['survey_complete'] == 0).sum() / len(past_surveys) * 100
+
+        time_since_last_survey = (current_dt - pd.to_datetime(last_survey_date)).days
+
+        #number days enrolled 
+        days_enrolled = (current_dt - id_timetable['survey_send_time'].min()).days
+
+        #Total Averages
+        am_mean_data_id = pd.DataFrame([{
+            'record_id':id,
+            'anxiety_mean': id_data['anxiety_am'].mean(),
+            'anxiety_sd': id_data['anxiety_am'].std(),
+            'attention_mean': id_data['attention_am'].mean(),
+            'attention_sd': id_data['attention_am'].std(),
+            'stress_mean': id_data['stress_am'].mean(),
+            'stress_sd': id_data['stress_am'].std(),
+            'depression_mean': id_data['depression_am'].mean(),
+            'depression_sd': id_data['depression_am'].std(),
+            'loneliness_mean': id_data['loneliness_am'].mean(),
+            'loneliness_sd': id_data['loneliness_am'].std()
+        }])
+
+        pm_mean_data_id = pd.DataFrame([{
+            'record_id':id,
+            'anxiety_mean': id_data['anxiety_pm'].mean(),
+            'anxiety_sd': id_data['anxiety_pm'].std(),
+            'attention_mean': id_data['attention_pm'].mean(),
+            'attention_sd': id_data['attention_pm'].std(),
+            'stress_mean': id_data['stress_pm'].mean(),
+            'stress_sd': id_data['stress_pm'].std(),
+            'depression_mean': id_data['depression_pm'].mean(),
+            'depression_sd': id_data['depression_pm'].std()
+        }])
+
+        #Last Scores
+        last_survey_data = id_data[id_data['ema_survey'] == last_survey_name].reset_index(drop=True)
+
+        last_data_id = pd.DataFrame([{
+            'record_id':id,
+            'last_survey_date': last_survey_date,
+            'last_survey': last_survey_name, 
+            'anxiety_last': last_survey_data['anxiety_' + last_survey_am_pm].iloc[0],
+            'attention_last': last_survey_data['attention_' + last_survey_am_pm].iloc[0],
+            'stress_last': last_survey_data['stress_' + last_survey_am_pm].iloc[0],
+            'depression_last': last_survey_data['depression_' + last_survey_am_pm].iloc[0],
+            'loneliness_last': last_survey_data['loneliness_' + last_survey_am_pm].iloc[0] if last_survey_am_pm == 'am' else np.nan
+        }])
+
+        #MAX Scores 
+        max_data_id = pd.DataFrame([{
+            'record_id': id,
+            'anxiety_max_am': id_data['anxiety_am'].max(),
+            'anxiety_max_pm': id_data['anxiety_pm'].max(),
+            'attention_max_am': id_data['attention_am'].max(),
+            'attention_max_pm': id_data['attention_pm'].max(),
+            'stress_max_am': id_data['stress_am'].max(),
+            'stress_max_pm': id_data['stress_pm'].max(),
+            'depression_max_am': id_data['depression_am'].max(),
+            'depression_max_pm': id_data['depression_pm'].max(),
+            'loneliness_max_am': id_data['loneliness_am'].max()
+        }])
+
+        #survey_info_data 
+
+        survey_info_id = pd.DataFrame([{
+            'record_id': id,
+            'todays_date': current_dt.round('S'),
+            'last_survey': last_survey_name,
+            'last_survey_date': last_survey_date,
+            'next_survey': next_survey_name,
+            'days_enrolled': days_enrolled,
+            'surveys_complete_perc': surveys_complete_perc,
+            'missed_surveys_flag': True if time_since_last_survey >= 7 else False
+        }])
+
+        survey_info = pd.concat([survey_info, survey_info_id], ignore_index=True)
+        am_mean_data = pd.concat([am_mean_data, am_mean_data_id], ignore_index=True)
+        pm_mean_data = pd.concat([pm_mean_data, pm_mean_data_id], ignore_index=True)
+        max_data = pd.concat([max_data, max_data_id], ignore_index=False)
+        last_data = pd.concat([last_data, last_data_id], ignore_index=False)
+
+    if data_type is None:
+        return survey_info, am_mean_data, pm_mean_data, max_data, last_data
+    else:
+        return data_type
 #-----------------------
 
 #14-----------------------
