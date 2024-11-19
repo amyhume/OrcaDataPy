@@ -1490,10 +1490,18 @@ def peach_ema_data_pull(token, data_type=None):
         max_data = pd.concat([max_data, max_data_id], ignore_index=False)
         last_data = pd.concat([last_data, last_data_id], ignore_index=False)
 
+    data_map = {
+        'survey_info': survey_info,
+        'am_mean_data': am_mean_data,
+        'pm_mean_data': pm_mean_data,
+        'max_data': max_data,
+        'last_data': last_data
+    }
+
     if data_type is None:
         return survey_info, am_mean_data, pm_mean_data, max_data, last_data
     else:
-        return data_type
+        return data_map.get(data_type, None)
 #-----------------------
 
 #14-----------------------
