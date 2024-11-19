@@ -1356,8 +1356,10 @@ def peach_ema_data_pull(token, data_type=None):
     """
     import pandas as pd
     import numpy as np
+    import warnings
 
     #pulling all survey timetables
+
     survey_timetable = get_orca_data(token, form='survey_timetable', form_complete=False)
 
     #pulling domain scores for each week
@@ -1484,11 +1486,14 @@ def peach_ema_data_pull(token, data_type=None):
             'missed_surveys_flag': True if time_since_last_survey >= 7 else False
         }])
 
-        survey_info = pd.concat([survey_info, survey_info_id], ignore_index=True)
-        am_mean_data = pd.concat([am_mean_data, am_mean_data_id], ignore_index=True)
-        pm_mean_data = pd.concat([pm_mean_data, pm_mean_data_id], ignore_index=True)
-        max_data = pd.concat([max_data, max_data_id], ignore_index=False)
-        last_data = pd.concat([last_data, last_data_id], ignore_index=False)
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", FutureWarning)
+
+            survey_info = pd.concat([survey_info, survey_info_id], ignore_index=True)
+            am_mean_data = pd.concat([am_mean_data, am_mean_data_id], ignore_index=True)
+            pm_mean_data = pd.concat([pm_mean_data, pm_mean_data_id], ignore_index=True)
+            max_data = pd.concat([max_data, max_data_id], ignore_index=False)
+            last_data = pd.concat([last_data, last_data_id], ignore_index=False)
 
     data_map = {
         'survey_info': survey_info,
