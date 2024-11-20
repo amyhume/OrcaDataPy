@@ -1328,13 +1328,13 @@ def get_ema_data(token, am_or_pm = 'am'):
     if am_or_pm == 'am':
         ema = get_orca_data(token, form='ema_am_survey')
         ema = ema[ema['record_id'].str.contains('pch')]
-        ema = ema[['record_id', 'redcap_event_name', 'ema_am_survey_timestamp', 'anxiety_am', 'attention_am', 'stress_am', 'depression_am', 'loneliness_am']]
-        ema.rename(columns={'ema_am_survey_timestamp': 'ema_survey_timestamp', 'redcap_event_name': 'ema_survey'}, inplace=True)
+        ema = ema[['record_id', 'redcap_event_name', 'ema_am_survey_timestamp', 'anxiety_am', 'attention_am', 'stress_am', 'depression_am', 'loneliness_am', 'ema_am_extra']]
+        ema.rename(columns={'ema_am_survey_timestamp': 'ema_survey_timestamp', 'redcap_event_name': 'ema_survey',  'ema_am_extra': 'ema_comments'}, inplace=True)
     elif am_or_pm == 'pm':
         ema = get_orca_data(token, form='ema_pm_survey')
         ema = ema[ema['record_id'].str.contains('pch')]
-        ema = ema[['record_id', 'redcap_event_name', 'ema_pm_survey_timestamp', 'anxiety_pm', 'attention_pm', 'stress_pm', 'depression_pm']]
-        ema.rename(columns={'ema_pm_survey_timestamp': 'ema_survey_timestamp', 'redcap_event_name': 'ema_survey'}, inplace=True)
+        ema = ema[['record_id', 'redcap_event_name', 'ema_pm_survey_timestamp', 'anxiety_pm', 'attention_pm', 'stress_pm', 'depression_pm', 'ema_pm_extra']]
+        ema.rename(columns={'ema_pm_survey_timestamp': 'ema_survey_timestamp', 'redcap_event_name': 'ema_survey', 'ema_pm_extra': 'ema_comments'}, inplace=True)
 
     ema['ema_survey'] = ema['ema_survey'].str.replace('_arm_1', '_'+am_or_pm, regex=False)
     ema['ema_survey'] = ema['ema_survey'].str.replace('eek_', '')
@@ -1349,15 +1349,17 @@ def peach_ema_data_pull(token, data_type=None):
 
     Args:
         token (str): The API token for the PEACH redcap project. 
-        data_type (str): if you just want to pull one data type. Default is None and pulls all (survey_info, am_mean_data, pm_mean_data, max_data, last_data)
+        data_type (str): if you just want to pull one data type. Default is None and pulls all (survey_info, last_data, mean_data)
 
     Returns:
-        pandas.DataFrame: 1 or 5 dataframes (survey_info, am_mean_data, pm_mean_data, max_data, last_data)
+        pandas.DataFrame: 1 or 3 dataframes (survey_info, last_data, mean_data)
     """
     import pandas as pd
     import numpy as np
+    import warnings
 
     #pulling all survey timetables
+
     survey_timetable = get_orca_data(token, form='survey_timetable', form_complete=False)
 
     #pulling domain scores for each week
@@ -1369,12 +1371,10 @@ def peach_ema_data_pull(token, data_type=None):
 
     #creating empty dfs
     survey_info = pd.DataFrame(columns=['record_id','todays_date','last_survey','last_survey_date','next_survey','days_enrolled','surveys_complete_perc','missed_surveys_flag'])
-    am_mean_data = pd.DataFrame(columns=['record_id','anxiety_mean','anxiety_sd','attention_mean','attention_sd','stress_mean','stress_sd','depression_mean','depression_sd','loneliness_mean','loneliness_sd'])
-    pm_mean_data = pd.DataFrame(columns=['record_id','anxiety_mean','anxiety_sd','attention_mean','attention_sd','stress_mean','stress_sd','depression_mean','depression_sd'])
-    last_data = pd.DataFrame(columns=['record_id', 'last_survey_date', 'last_survey', 'anxiety_last','attention_last', 'stress_last', 'depression_last', 'loneliness_last'])
-    max_data = pd.DataFrame(columns=['record_id', 'anxiety_max_am', 'anxiety_max_pm', 'attention_max_am','attention_max_pm', 'stress_max_am', 'stress_max_pm','depression_max_am', 'depression_max_pm', 'loneliness_max_am'])
+    mean_data = pd.DataFrame(columns=['record_id','anxiety_mean_am','anxiety_mean_pm','attention_mean_am','attention_mean_pm','stress_mean_am','stress_mean_pm','depression_mean_am','depression_mean_pm','loneliness_mean_am'])
+    last_data = pd.DataFrame(columns=['record_id', 'last_survey_date', 'last_survey', 'anxiety_last','attention_last', 'stress_last', 'depression_last', 'loneliness_last', 'comment_last'])
 
-
+    id = unique_ids[2]
     for id in unique_ids:
         id_data_am = ema_am_domains[ema_am_domains['record_id'] == id].copy().reset_index(drop=True)
         id_data_pm = ema_pm_domains[ema_pm_domains['record_id'] == id].copy().reset_index(drop=True)
@@ -1417,30 +1417,17 @@ def peach_ema_data_pull(token, data_type=None):
         days_enrolled = (current_dt - id_timetable['survey_send_time'].min()).days
 
         #Total Averages
-        am_mean_data_id = pd.DataFrame([{
+        mean_data_id = pd.DataFrame([{
             'record_id':id,
-            'anxiety_mean': id_data['anxiety_am'].mean(),
-            'anxiety_sd': id_data['anxiety_am'].std(),
-            'attention_mean': id_data['attention_am'].mean(),
-            'attention_sd': id_data['attention_am'].std(),
-            'stress_mean': id_data['stress_am'].mean(),
-            'stress_sd': id_data['stress_am'].std(),
-            'depression_mean': id_data['depression_am'].mean(),
-            'depression_sd': id_data['depression_am'].std(),
-            'loneliness_mean': id_data['loneliness_am'].mean(),
-            'loneliness_sd': id_data['loneliness_am'].std()
-        }])
-
-        pm_mean_data_id = pd.DataFrame([{
-            'record_id':id,
-            'anxiety_mean': id_data['anxiety_pm'].mean(),
-            'anxiety_sd': id_data['anxiety_pm'].std(),
-            'attention_mean': id_data['attention_pm'].mean(),
-            'attention_sd': id_data['attention_pm'].std(),
-            'stress_mean': id_data['stress_pm'].mean(),
-            'stress_sd': id_data['stress_pm'].std(),
-            'depression_mean': id_data['depression_pm'].mean(),
-            'depression_sd': id_data['depression_pm'].std()
+            'anxiety_mean_am': id_data['anxiety_am'].mean(),
+            'anxiety_mean_pm': id_data['anxiety_pm'].mean(),
+            'attention_mean_am': id_data['attention_am'].mean(),
+            'attention_mean_pm': id_data['attention_pm'].mean(),
+            'stress_mean_am': id_data['stress_am'].mean(),
+            'stress_mean_pm': id_data['stress_pm'].mean(),
+            'depression_mean_am': id_data['depression_am'].mean(),
+            'depression_mean_pm': id_data['depression_pm'].mean(),
+            'loneliness_mean_am': id_data['loneliness_am'].mean(),
         }])
 
         #Last Scores
@@ -1454,23 +1441,11 @@ def peach_ema_data_pull(token, data_type=None):
             'attention_last': last_survey_data['attention_' + last_survey_am_pm].iloc[0],
             'stress_last': last_survey_data['stress_' + last_survey_am_pm].iloc[0],
             'depression_last': last_survey_data['depression_' + last_survey_am_pm].iloc[0],
-            'loneliness_last': last_survey_data['loneliness_' + last_survey_am_pm].iloc[0] if last_survey_am_pm == 'am' else np.nan
+            'loneliness_last': last_survey_data['loneliness_' + last_survey_am_pm].iloc[0] if last_survey_am_pm == 'am' else np.nan,
+            'comment_last': last_survey_data['ema_comments'] 
         }])
 
         #MAX Scores 
-        max_data_id = pd.DataFrame([{
-            'record_id': id,
-            'anxiety_max_am': id_data['anxiety_am'].max(),
-            'anxiety_max_pm': id_data['anxiety_pm'].max(),
-            'attention_max_am': id_data['attention_am'].max(),
-            'attention_max_pm': id_data['attention_pm'].max(),
-            'stress_max_am': id_data['stress_am'].max(),
-            'stress_max_pm': id_data['stress_pm'].max(),
-            'depression_max_am': id_data['depression_am'].max(),
-            'depression_max_pm': id_data['depression_pm'].max(),
-            'loneliness_max_am': id_data['loneliness_am'].max()
-        }])
-
         #survey_info_data 
 
         survey_info_id = pd.DataFrame([{
@@ -1484,16 +1459,23 @@ def peach_ema_data_pull(token, data_type=None):
             'missed_surveys_flag': True if time_since_last_survey >= 7 else False
         }])
 
-        survey_info = pd.concat([survey_info, survey_info_id], ignore_index=True)
-        am_mean_data = pd.concat([am_mean_data, am_mean_data_id], ignore_index=True)
-        pm_mean_data = pd.concat([pm_mean_data, pm_mean_data_id], ignore_index=True)
-        max_data = pd.concat([max_data, max_data_id], ignore_index=False)
-        last_data = pd.concat([last_data, last_data_id], ignore_index=False)
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", FutureWarning)
+
+            survey_info = pd.concat([survey_info, survey_info_id], ignore_index=True)
+            mean_data = pd.concat([mean_data, mean_data_id], ignore_index=True)
+            last_data = pd.concat([last_data, last_data_id], ignore_index=False)
+
+    data_map = {
+        'survey_info': survey_info,
+        'last_data': last_data,
+        'mean_data': mean_data,
+    }
 
     if data_type is None:
-        return survey_info, am_mean_data, pm_mean_data, max_data, last_data
+        return survey_info, last_data, mean_data
     else:
-        return data_type
+        return data_map.get(data_type, None)
 #-----------------------
 
 #14-----------------------
