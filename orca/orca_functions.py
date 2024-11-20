@@ -1374,7 +1374,6 @@ def peach_ema_data_pull(token, data_type=None):
     mean_data = pd.DataFrame(columns=['record_id','anxiety_mean_am','anxiety_mean_pm','attention_mean_am','attention_mean_pm','stress_mean_am','stress_mean_pm','depression_mean_am','depression_mean_pm','loneliness_mean_am'])
     last_data = pd.DataFrame(columns=['record_id', 'last_survey_date', 'last_survey', 'anxiety_last','attention_last', 'stress_last', 'depression_last', 'loneliness_last', 'comment_last'])
 
-    id = unique_ids[2]
     for id in unique_ids:
         id_data_am = ema_am_domains[ema_am_domains['record_id'] == id].copy().reset_index(drop=True)
         id_data_pm = ema_pm_domains[ema_pm_domains['record_id'] == id].copy().reset_index(drop=True)
