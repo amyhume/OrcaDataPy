@@ -1442,7 +1442,7 @@ def peach_ema_data_pull(token, data_type=None):
             'stress_last': last_survey_data['stress_' + last_survey_am_pm].iloc[0],
             'depression_last': last_survey_data['depression_' + last_survey_am_pm].iloc[0],
             'loneliness_last': last_survey_data['loneliness_' + last_survey_am_pm].iloc[0] if last_survey_am_pm == 'am' else np.nan,
-            'comment_last': last_survey_data['ema_comments'] 
+            'comment_last': last_survey_data['ema_comments'].iloc[0]
         }])
 
         #MAX Scores 
