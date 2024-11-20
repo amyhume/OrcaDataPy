@@ -1419,15 +1419,15 @@ def peach_ema_data_pull(token, data_type=None):
         #Total Averages
         mean_data_id = pd.DataFrame([{
             'record_id':id,
-            'anxiety_mean_am': id_data['anxiety_am'].mean(),
-            'anxiety_mean_pm': id_data['anxiety_pm'].mean(),
-            'attention_mean_am': id_data['attention_am'].mean(),
-            'attention_mean_pm': id_data['attention_pm'].mean(),
-            'stress_mean_am': id_data['stress_am'].mean(),
-            'stress_mean_pm': id_data['stress_pm'].mean(),
-            'depression_mean_am': id_data['depression_am'].mean(),
-            'depression_mean_pm': id_data['depression_pm'].mean(),
-            'loneliness_mean_am': id_data['loneliness_am'].mean(),
+            'anxiety_mean_am': round(id_data['anxiety_am'].mean(), 2),
+            'anxiety_mean_pm': round(id_data['anxiety_pm'].mean(), 2),
+            'attention_mean_am': round(id_data['attention_am'].mean(), 2),
+            'attention_mean_pm': round(id_data['attention_pm'].mean(), 2),
+            'stress_mean_am': round(id_data['stress_am'].mean(), 2),
+            'stress_mean_pm': round(id_data['stress_pm'].mean(), 2),
+            'depression_mean_am': round(id_data['depression_am'].mean(), 2),
+            'depression_mean_pm': round(id_data['depression_pm'].mean(), 2),
+            'loneliness_mean_am': round(id_data['loneliness_am'].mean(), 2),
         }])
 
         #Last Scores
@@ -1455,7 +1455,7 @@ def peach_ema_data_pull(token, data_type=None):
             'last_survey_date': last_survey_date,
             'next_survey': next_survey_name,
             'days_enrolled': days_enrolled,
-            'surveys_complete_perc': surveys_complete_perc,
+            'surveys_complete_perc': round(surveys_complete_perc, 2),
             'missed_surveys_flag': True if time_since_last_survey >= 7 else False
         }])
 
