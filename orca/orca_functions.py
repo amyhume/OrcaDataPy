@@ -89,6 +89,12 @@ def get_orca_data(token, form, raw_v_label = 'raw', timepoint = 'all',form_compl
 
     df = pd.read_csv(io.StringIO(r.text))
     df = df[~df['record_id'].str.contains('TEST')]
+    df = df[~df['record_id'].str.contains('test')]
+    df = df[~df['record_id'].str.contains('D')]
+    df = df[df['record_id'] != '496']
+    df = df[df['record_id'] != '497']
+    df = df[df['record_id'] != '498']
+    df = df[df['record_id'] != '499']
 
     if form_complete:
         record_filter = f"{form}_complete"
@@ -139,7 +145,17 @@ def get_orca_field(token, field, raw_v_label = 'raw'):
     
     df = pd.read_csv(io.StringIO(r.text))
     df = df[~df['record_id'].str.contains('TEST')]
-    df = df[df[field].notna()]
+    df = df[~df['record_id'].str.contains('test')]
+    df = df[~df['record_id'].str.contains('D')]
+    df = df[df['record_id'] != '496']
+    df = df[df['record_id'] != '497']
+    df = df[df['record_id'] != '498']
+    df = df[df['record_id'] != '499']
+
+    col_number = len(df.columns) - 1
+    if col_number > 2:
+        df = df[df.iloc[:, 2:col_number].notna().any(axis=1)].reset_index(drop=True)
+
     return df
 #-----------------------
 
@@ -345,7 +361,7 @@ def get_task_completion(token, record_id = None, transposed = False, timepoint='
 #-----------------------
 
 #7-----------------------
-def get_task_info(token, record_id = None, transposed = False, timepoint='orca_4month_arm_1'):
+def get_task_info(token, record_id = None, transposed = False, timepoint='orca_4month_arm_1', mp4_times = False):
     """
     Retrieves 3 data frames - task timestamps, completion status, and data presence for all ids or a particular id.
     Returns in order of: task_completion, task_data, task_timestamps
@@ -355,6 +371,7 @@ def get_task_info(token, record_id = None, transposed = False, timepoint='orca_4
         record_id (str): the record id you wish to pull (e.g. '218'). Default is 'none' and will pull the whole dataset
         transposed: Whether you want it in long format (for just one id) - default is False. Can only mark as True if you also specify a record id
         timepoint (str): the redcap event name of the timepoint you wish to pull. Default is orca_4month_arm_1
+        mp4_times (Boolean): whether to return mp4 times in the get_task_timestamps
 
     Returns:
         pandas.DataFrame: 3 DataFrames (runs get_task_completion, get_task_timestamps,get_task_data).
@@ -365,10 +382,16 @@ def get_task_info(token, record_id = None, transposed = False, timepoint='orca_4
     import io
 
     task_completion = get_task_completion(token, record_id, transposed, timepoint)
-    task_timestamps = get_task_timestamps(token, record_id, transposed, timepoint)
+    if mp4_times:
+        task_timestamps, mp4_fp_timestamps = get_task_timestamps(token, record_id, transposed, timepoint, mp4_times)
+    else:
+        task_timestamps = get_task_timestamps(token, record_id, transposed, timepoint, mp4_times)
     task_data = get_task_data(token, record_id, transposed, timepoint)
 
-    return task_completion, task_data, task_timestamps
+    if mp4_times:
+        return task_completion, task_data, task_timestamps, mp4_fp_timestamps
+    else:
+        return task_completion, task_data, task_timestamps
 #-----------------------
 
 #8-----------------------
@@ -398,8 +421,8 @@ def get_movesense_numbers(token, record_id = None, timepoint = 'orca_4month_arm_
     if record_id != None:
         visit_notes = visit_notes[visit_notes['record_id'] == record_id]
         visit_notes.reset_index(drop=True, inplace=True)
-        child_number = str(int(visit_notes[child_column_name])) if not visit_notes[child_column_name].empty else np.nan
-        parent_number = str(int(visit_notes[parent_column_name])) if not visit_notes[parent_column_name].empty else np.nan
+        child_number = str(int(visit_notes[child_column_name].iloc[0])) if not visit_notes[child_column_name].empty else np.nan
+        parent_number = str(int(visit_notes[parent_column_name].iloc[0])) if not visit_notes[parent_column_name].empty else np.nan
         return parent_number, child_number
     else:
         visit_notes = visit_notes[['record_id', parent_column_name, child_column_name]]
