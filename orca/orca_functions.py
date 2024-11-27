@@ -143,10 +143,8 @@ def get_orca_field(token, field, raw_v_label = 'raw'):
     return df
 #-----------------------
 
-token = '25120FD84FFDA3B220617BDF23B680CD'
-record_id = '209'
 #4-----------------------
-def get_task_timestamps(token, record_id = None, transposed = False, timepoint = 'orca_4month_arm_1'):
+def get_task_timestamps(token, record_id = None, transposed = False, timepoint = 'orca_4month_arm_1', mp4_times = False):
     """
     Retrieve task timestamps for a particular ID in real time (EST).
 
@@ -155,6 +153,7 @@ def get_task_timestamps(token, record_id = None, transposed = False, timepoint =
         record_id (str): the record id you wish to pull (e.g. '218'). Default is 'none' and will pull the whole dataset
         transposed: Whether you want it in long format (for just one id) - default is False. Can only mark as True if you also specify a record id
         timepoint (str): the redcap event name of the timepoint you wish to pull. Default is orca_4month_arm_1
+        mp4_times (boolean): whether to return a second data frame with the mp4 fp / break times. Default is False
 
     Returns:
         pandas.DataFrame: A DataFrame with the retrieved record id, task marker, timestamp in est.
@@ -172,9 +171,9 @@ def get_task_timestamps(token, record_id = None, transposed = False, timepoint =
             visit_date = str(visit_notes['visit_date_4m'])
             visit_date = visit_date.split()[1]
 
-            markers = visit_notes[['richards_start_4m', 'richards_end_4m', 'vpc_start_4m', 'vpc_end_4m','srt_start_4m', 'srt_end_4m', 'cecile_start_4m', 'cecile_end_4m','relational_memory_start_4m', 'relational_memory_end_4m', 'notoy_start_real_4m','notoy_end_real_4m', 'toy_start_real_4m', 'toy_end_real_4m']]
+            markers = visit_notes[['richards_start_4m', 'richards_end_4m', 'vpc_start_4m', 'vpc_end_4m','srt_start_4m', 'srt_end_4m', 'cecile_start_4m', 'cecile_end_4m','relational_memory_start_4m', 'relational_memory_end_4m', 'notoy_start_real_4m','notoy_end_real_4m', 'toy_start_real_4m', 'toy_end_real_4m', 'fp_nt_break_start_real_4m', 'fp_nt_break_end_real_4m', 'fp_t_break_start_real_4m', 'fp_t_break_end_real_4m']]
         else:
-            markers = visit_notes[['record_id', 'richards_start_4m', 'richards_end_4m', 'vpc_start_4m', 'vpc_end_4m','srt_start_4m', 'srt_end_4m', 'cecile_start_4m', 'cecile_end_4m','relational_memory_start_4m', 'relational_memory_end_4m', 'notoy_start_real_4m','notoy_end_real_4m', 'toy_start_real_4m', 'toy_end_real_4m']]
+            markers = visit_notes[['record_id', 'richards_start_4m', 'richards_end_4m', 'vpc_start_4m', 'vpc_end_4m','srt_start_4m', 'srt_end_4m', 'cecile_start_4m', 'cecile_end_4m','relational_memory_start_4m', 'relational_memory_end_4m', 'notoy_start_real_4m','notoy_end_real_4m', 'toy_start_real_4m', 'toy_end_real_4m',  'fp_nt_break_start_real_4m', 'fp_nt_break_end_real_4m', 'fp_t_break_start_real_4m', 'fp_t_break_end_real_4m']]
 
         if transposed == True and record_id != None:
             markers = markers.transpose()
@@ -187,6 +186,18 @@ def get_task_timestamps(token, record_id = None, transposed = False, timepoint =
 
         elif transposed == True and record_id == None:
             print('cannot transpose without selecting a record id')
+
+        if mp4_times == True and record_id != None:
+            mp4_markers = visit_notes[['notoy_start_4m', 'notoy_end_4m', 'toy_start_4m', 'toy_end_4m', 'fp_nt_break_start_4m', 'fp_nt_break_end_4m', 'fp_t_break_start_4m', 'fp_t_break_end_4m']]
+            if transposed == True:
+                mp4_markers = mp4_markers.transpose()
+                mp4_markers = mp4_markers.rename_axis('marker').reset_index()
+                mp4_markers.columns = ['marker', 'timestamp_mp4']
+                mp4_markers['record_id'] = record_id
+                mp4_markers = mp4_markers[['record_id', 'marker', 'timestamp_mp4']]
+
+        elif mp4_times == True and record_id is None:
+            mp4_markers = visit_notes[['record_id', 'notoy_start_4m', 'notoy_end_4m', 'toy_start_4m', 'toy_end_4m', 'fp_nt_break_start_4m', 'fp_nt_break_end_4m', 'fp_t_break_start_4m', 'fp_t_break_end_4m']]
     
     elif timepoint == 'orca_8month_arm_1':
         visit_notes = get_orca_data(token, form="visit_notes_8m", timepoint=timepoint,form_complete=False)
@@ -214,7 +225,11 @@ def get_task_timestamps(token, record_id = None, transposed = False, timepoint =
         elif transposed == True and record_id == None:
             print('cannot transpose without selecting a record id')
 
-    return markers
+    if mp4_times == True:
+        return markers, mp4_markers
+    else:
+        return markers
+
 #-----------------------
 
 #5-----------------------

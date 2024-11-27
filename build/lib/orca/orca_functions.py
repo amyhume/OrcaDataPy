@@ -143,10 +143,8 @@ def get_orca_field(token, field, raw_v_label = 'raw'):
     return df
 #-----------------------
 
-token = '25120FD84FFDA3B220617BDF23B680CD'
-record_id = '209'
 #4-----------------------
-def get_task_timestamps(token, record_id = None, transposed = False, timepoint = 'orca_4month_arm_1'):
+def get_task_timestamps(token, record_id = None, transposed = False, timepoint = 'orca_4month_arm_1', mp4_times = False):
     """
     Retrieve task timestamps for a particular ID in real time (EST).
 
@@ -155,6 +153,7 @@ def get_task_timestamps(token, record_id = None, transposed = False, timepoint =
         record_id (str): the record id you wish to pull (e.g. '218'). Default is 'none' and will pull the whole dataset
         transposed: Whether you want it in long format (for just one id) - default is False. Can only mark as True if you also specify a record id
         timepoint (str): the redcap event name of the timepoint you wish to pull. Default is orca_4month_arm_1
+        mp4_times (boolean): whether to return a second data frame with the mp4 fp / break times. Default is False
 
     Returns:
         pandas.DataFrame: A DataFrame with the retrieved record id, task marker, timestamp in est.
@@ -172,9 +171,9 @@ def get_task_timestamps(token, record_id = None, transposed = False, timepoint =
             visit_date = str(visit_notes['visit_date_4m'])
             visit_date = visit_date.split()[1]
 
-            markers = visit_notes[['richards_start_4m', 'richards_end_4m', 'vpc_start_4m', 'vpc_end_4m','srt_start_4m', 'srt_end_4m', 'cecile_start_4m', 'cecile_end_4m','relational_memory_start_4m', 'relational_memory_end_4m', 'notoy_start_real_4m','notoy_end_real_4m', 'toy_start_real_4m', 'toy_end_real_4m']]
+            markers = visit_notes[['richards_start_4m', 'richards_end_4m', 'vpc_start_4m', 'vpc_end_4m','srt_start_4m', 'srt_end_4m', 'cecile_start_4m', 'cecile_end_4m','relational_memory_start_4m', 'relational_memory_end_4m', 'notoy_start_real_4m','notoy_end_real_4m', 'toy_start_real_4m', 'toy_end_real_4m', 'fp_nt_break_start_real_4m', 'fp_nt_break_end_real_4m', 'fp_t_break_start_real_4m', 'fp_t_break_end_real_4m']]
         else:
-            markers = visit_notes[['record_id', 'richards_start_4m', 'richards_end_4m', 'vpc_start_4m', 'vpc_end_4m','srt_start_4m', 'srt_end_4m', 'cecile_start_4m', 'cecile_end_4m','relational_memory_start_4m', 'relational_memory_end_4m', 'notoy_start_real_4m','notoy_end_real_4m', 'toy_start_real_4m', 'toy_end_real_4m']]
+            markers = visit_notes[['record_id', 'richards_start_4m', 'richards_end_4m', 'vpc_start_4m', 'vpc_end_4m','srt_start_4m', 'srt_end_4m', 'cecile_start_4m', 'cecile_end_4m','relational_memory_start_4m', 'relational_memory_end_4m', 'notoy_start_real_4m','notoy_end_real_4m', 'toy_start_real_4m', 'toy_end_real_4m',  'fp_nt_break_start_real_4m', 'fp_nt_break_end_real_4m', 'fp_t_break_start_real_4m', 'fp_t_break_end_real_4m']]
 
         if transposed == True and record_id != None:
             markers = markers.transpose()
@@ -187,6 +186,18 @@ def get_task_timestamps(token, record_id = None, transposed = False, timepoint =
 
         elif transposed == True and record_id == None:
             print('cannot transpose without selecting a record id')
+
+        if mp4_times == True and record_id != None:
+            mp4_markers = visit_notes[['notoy_start_4m', 'notoy_end_4m', 'toy_start_4m', 'toy_end_4m', 'fp_nt_break_start_4m', 'fp_nt_break_end_4m', 'fp_t_break_start_4m', 'fp_t_break_end_4m']]
+            if transposed == True:
+                mp4_markers = mp4_markers.transpose()
+                mp4_markers = mp4_markers.rename_axis('marker').reset_index()
+                mp4_markers.columns = ['marker', 'timestamp_mp4']
+                mp4_markers['record_id'] = record_id
+                mp4_markers = mp4_markers[['record_id', 'marker', 'timestamp_mp4']]
+
+        elif mp4_times == True and record_id is None:
+            mp4_markers = visit_notes[['record_id', 'notoy_start_4m', 'notoy_end_4m', 'toy_start_4m', 'toy_end_4m', 'fp_nt_break_start_4m', 'fp_nt_break_end_4m', 'fp_t_break_start_4m', 'fp_t_break_end_4m']]
     
     elif timepoint == 'orca_8month_arm_1':
         visit_notes = get_orca_data(token, form="visit_notes_8m", timepoint=timepoint,form_complete=False)
@@ -214,7 +225,11 @@ def get_task_timestamps(token, record_id = None, transposed = False, timepoint =
         elif transposed == True and record_id == None:
             print('cannot transpose without selecting a record id')
 
-    return markers
+    if mp4_times == True:
+        return markers, mp4_markers
+    else:
+        return markers
+
 #-----------------------
 
 #5-----------------------
@@ -1374,7 +1389,6 @@ def peach_ema_data_pull(token, data_type=None):
     mean_data = pd.DataFrame(columns=['record_id','anxiety_mean_am','anxiety_mean_pm','attention_mean_am','attention_mean_pm','stress_mean_am','stress_mean_pm','depression_mean_am','depression_mean_pm','loneliness_mean_am'])
     last_data = pd.DataFrame(columns=['record_id', 'last_survey_date', 'last_survey', 'anxiety_last','attention_last', 'stress_last', 'depression_last', 'loneliness_last', 'comment_last'])
 
-    id = unique_ids[2]
     for id in unique_ids:
         id_data_am = ema_am_domains[ema_am_domains['record_id'] == id].copy().reset_index(drop=True)
         id_data_pm = ema_pm_domains[ema_pm_domains['record_id'] == id].copy().reset_index(drop=True)
@@ -1419,15 +1433,15 @@ def peach_ema_data_pull(token, data_type=None):
         #Total Averages
         mean_data_id = pd.DataFrame([{
             'record_id':id,
-            'anxiety_mean_am': id_data['anxiety_am'].mean(),
-            'anxiety_mean_pm': id_data['anxiety_pm'].mean(),
-            'attention_mean_am': id_data['attention_am'].mean(),
-            'attention_mean_pm': id_data['attention_pm'].mean(),
-            'stress_mean_am': id_data['stress_am'].mean(),
-            'stress_mean_pm': id_data['stress_pm'].mean(),
-            'depression_mean_am': id_data['depression_am'].mean(),
-            'depression_mean_pm': id_data['depression_pm'].mean(),
-            'loneliness_mean_am': id_data['loneliness_am'].mean(),
+            'anxiety_mean_am': round(id_data['anxiety_am'].mean(), 2),
+            'anxiety_mean_pm': round(id_data['anxiety_pm'].mean(), 2),
+            'attention_mean_am': round(id_data['attention_am'].mean(), 2),
+            'attention_mean_pm': round(id_data['attention_pm'].mean(), 2),
+            'stress_mean_am': round(id_data['stress_am'].mean(), 2),
+            'stress_mean_pm': round(id_data['stress_pm'].mean(), 2),
+            'depression_mean_am': round(id_data['depression_am'].mean(), 2),
+            'depression_mean_pm': round(id_data['depression_pm'].mean(), 2),
+            'loneliness_mean_am': round(id_data['loneliness_am'].mean(), 2),
         }])
 
         #Last Scores
@@ -1442,7 +1456,7 @@ def peach_ema_data_pull(token, data_type=None):
             'stress_last': last_survey_data['stress_' + last_survey_am_pm].iloc[0],
             'depression_last': last_survey_data['depression_' + last_survey_am_pm].iloc[0],
             'loneliness_last': last_survey_data['loneliness_' + last_survey_am_pm].iloc[0] if last_survey_am_pm == 'am' else np.nan,
-            'comment_last': last_survey_data['ema_comments'] 
+            'comment_last': last_survey_data['ema_comments'].iloc[0]
         }])
 
         #MAX Scores 
@@ -1455,7 +1469,7 @@ def peach_ema_data_pull(token, data_type=None):
             'last_survey_date': last_survey_date,
             'next_survey': next_survey_name,
             'days_enrolled': days_enrolled,
-            'surveys_complete_perc': surveys_complete_perc,
+            'surveys_complete_perc': round(surveys_complete_perc, 2),
             'missed_surveys_flag': True if time_since_last_survey >= 7 else False
         }])
 
