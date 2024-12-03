@@ -526,37 +526,26 @@ def get_movesense_times(token, record_id, who, timepoint='orca_4month_arm_1'):
     parent_off = [col for col in visit_notes.columns if 'cg_movesense_off' in col][0]
 
     movesense_times = visit_notes[['record_id', parent_on,child_on, parent_off, child_off]]
-    movesense_times = movesense_times[movesense_times['record_id'] == record_id]
+    movesense_times = movesense_times[movesense_times['record_id'] == record_id].reset_index(drop=True)
 
     date = get_orca_field(token, field = "visit_date_"+timepoint[5:7])
     date = date[date['record_id'] == record_id]
+    date = date[date['redcap_event_name'] == timepoint]
     date = str(date["visit_date_"+timepoint[5:7]])
     date = date.split()[1]
 
     if who == 'cg':
         on_time = str(movesense_times[parent_on]).split()[1]
         off_time = str(movesense_times[parent_off]).split()[1]
-        if on_time != 'NaN' and off_time != 'NaN':
-            on_time = pd.to_datetime(date+ ' ' + on_time)
-            off_time = pd.to_datetime(date+ ' ' + off_time)
-        elif on_time != 'NaN' and off_time == 'NaN':
-            on_time = pd.to_datetime(date+ ' ' + on_time)
-        elif on_time == 'NaN' and off_time != 'NaN':
-            off_time = pd.to_datetime(date+ ' ' + off_time)
-        
     elif who == 'child':
         on_time = str(movesense_times[child_on]).split()[1]
         off_time = str(movesense_times[child_off]).split()[1]
-        if on_time != 'NaN' and off_time != 'NaN':
-            on_time = pd.to_datetime(date+ ' ' + on_time)
-            off_time = pd.to_datetime(date+ ' ' + off_time)
-        elif on_time != 'NaN' and off_time == 'NaN':
-            on_time = pd.to_datetime(date+ ' ' + on_time)
-        elif on_time == 'NaN' and off_time != 'NaN':
-            off_time = pd.to_datetime(date+ ' ' + off_time)
 
-    on_time = pytz.timezone('America/New_York').localize(on_time) if on_time != 'NaN' else pd.NaT
-    off_time = pytz.timezone('America/New_York').localize(off_time) if off_time != 'NaN' else pd.NaT
+    on_time = pd.to_datetime(date+ ' ' + on_time) if on_time != 'NaN' else np.nan
+    off_time = pd.to_datetime(date+ ' ' + off_time) if off_time != 'NaN' else np.nan
+
+    on_time = pytz.timezone('America/New_York').localize(on_time) if pd.notna(on_time) else pd.NaT
+    off_time = pytz.timezone('America/New_York').localize(off_time) if pd.notna(off_time) else pd.NaT
 
     return on_time, off_time
 #-----------------------
