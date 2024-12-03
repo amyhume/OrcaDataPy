@@ -1548,8 +1548,15 @@ def check_freeplay_times(token, record_id, timepoint='orca_4month_arm_1'):
         timepoint (str): redcap event name for the timepoint you wish to check
 
     Returns:
-        Any errors present 
+        Boolean: True if no errors present and freeplay can be processed
     """
+    import os
+    import datetime
+    from datetime import datetime, timedelta, date as dt
+    import pandas as pd
+    import pytz
+    import numpy as np
+
     if timepoint != 'orca_4month_arm_1':
         return 'Function not built currently to work with timepoint other than 4m. Talk to amy!'
     
@@ -1585,18 +1592,18 @@ def check_freeplay_times(token, record_id, timepoint='orca_4month_arm_1'):
     #checking notoy 
     if notoy_complete and nt_times.isna().all():
         print('notoy is complete but there are no times recorded - check')
+        return False
     elif not notoy_complete and nt_times.notna().any(): 
         print('says no toy is incomplete but there have been times recorded - check')
-    elif (notoy_complete and nt_times.notna().all()) or (not notoy_complete and nt_times.isna().all()):
-        print('no discrepancies between task completion and timestamp completion for no toy')
+        return False
 
     #checking notoy 
     if toy_complete and t_times.isna().all():
         print('toy is complete but there are no times recorded - check')
+        return False
     elif not toy_complete and t_times.notna().any(): 
         print('says toy is complete but there have been times recorded - check')
-    elif (toy_complete and t_times.notna().all()) or (not toy_complete and t_times.isna().all()):
-        print('no discrepancies between task completion and timestamp completion for toy')
+        return False
 
     #finding any missing markers (including if task is complete and they're all missing)
     nt_missing = []
@@ -1608,20 +1615,23 @@ def check_freeplay_times(token, record_id, timepoint='orca_4month_arm_1'):
         t_missing = list(times.columns[slice(1,5)][t_times.isna()])
 
     if len(nt_missing) > 0 or len(t_missing) > 0:
-        return f'there is timestamps missing from the following conditions:\n no-toy: {nt_missing} \n toy: {t_missing} \n\n Double check and rerun'
+        print(f'there is timestamps missing from the following conditions:\n no-toy: {nt_missing} \n toy: {t_missing} \n\n Double check and rerun')
+        return False
     
     #2) duration of nt / t 
     if notoy_complete:
         nt_duration_real = (times.iloc[0,2] - times.iloc[0,1])
         nt_duration_mp4 = times.iloc[0,4] - times.iloc[0,3]
         if nt_duration_real != nt_duration_mp4:
-            return 'durations of mp4 and real times do not match, check NO TOY'
+            print('durations of mp4 and real times do not match, check NO TOY')
+            return False
     if toy_complete:
         t_duration_real = (times.iloc[1,2] - times.iloc[1,1])
         t_duration_mp4 = times.iloc[1,4] - times.iloc[1,3]
         if t_duration_real != t_duration_mp4:
-            return 'durations of mp4 and real times do not match, check TOY'
-
+            print('durations of mp4 and real times do not match, check TOY')
+            return False
+        
     #3) are durations over 5 mins? if so, are there breaks present? 
     breaks_comps = get_orca_field(token, field='freeplay_breaks_4m')
     breaks_comps = breaks_comps[breaks_comps['record_id'] == record_id].reset_index(drop=True)
@@ -1635,38 +1645,42 @@ def check_freeplay_times(token, record_id, timepoint='orca_4month_arm_1'):
     t_breaks_missing = []
 
     if notoy_complete:
-        if nt_duration_real > timedelta(minutes=5) and nt_breaks.isna().all():
-            return 'duration of no toy is above 5 mins and no breaks logged - check'
-        if nt_breaks.isna().any() and not nt_breaks.isna().all():
+        if (nt_breaks.isna().any() and not nt_breaks.isna().all()) or (nt_duration_real > timedelta(minutes=5) and nt_breaks.isna().all()):
             nt_breaks_missing = list(breaks.columns[slice(1,5)][nt_breaks.isna()]) 
     
     if toy_complete:
-        if t_duration_real > timedelta(minutes=5) and t_breaks.isna().all():
-            return 'duration of toy is above 5 mins and no breaks logged - check'
-
-        if t_breaks.isna().any() and not t_breaks.isna().all():
+        if (t_breaks.isna().any() and not t_breaks.isna().all()) or (t_duration_real > timedelta(minutes=5) and t_breaks.isna().all()):
             t_breaks_missing = list(breaks.columns[slice(1,5)][t_breaks.isna()])
+        
+    if len(nt_breaks_missing) > 0 or len(t_breaks_missing) > 0:
+        print(f'there are break timestamps missing from the following conditions:\n no-toy: {nt_breaks_missing} \n toy: {t_breaks_missing} \n\n Double check and rerun')
+        return False
 
     #4) do durations of breaks match each other
     if nt_breaks.notna().all():
         nt_breaks_duration_real = (breaks.iloc[0,2] - breaks.iloc[0,1])
         nt_breaks_duration_mp4 = (breaks.iloc[0,4] - breaks.iloc[0,3])
         if nt_duration_real != nt_duration_mp4:
-            return 'durations of mp4 and real time no toy breaks DO NOT MATCH'
+            print('durations of mp4 and real time no toy breaks DO NOT MATCH')
+            return False
     if t_breaks.notna().all():
         t_breaks_duration_real = (breaks.iloc[1,2] - breaks.iloc[1,1])
         t_breaks_duration_mp4 = (breaks.iloc[1,4] - breaks.iloc[1,3])
         if t_duration_real != t_duration_mp4:
-            return 'durations of mp4 and real time toy breaks DO NOT MATCH'
+            print('durations of mp4 and real time toy breaks DO NOT MATCH')
+            return False
 
     #5) do durations of breaks take the duration of the phase down to 0 
     if nt_breaks_comp:
         if (nt_duration_mp4 - nt_breaks_duration_mp4) != timedelta(minutes=5) or (nt_duration_real - nt_breaks_duration_real) != timedelta(minutes=5):
-            return 'no toy break durations do not take the task duration down to 5 minutes'
+            print('no toy break durations do not take the task duration down to 5 minutes')
+            return False
 
     if t_breaks_comp:
         if (t_duration_mp4 - t_breaks_duration_mp4) != timedelta(minutes=5) or (t_duration_real - t_breaks_duration_real) != timedelta(minutes=5):
-            return 'toy break durations do not take the task duration down to 5 minutes'
-        
-    return 'no issues with freeplay timestamps!'
+            print('toy break durations do not take the task duration down to 5 minutes')
+            return False
+
+    print('no issues with freeplay timestamps!')
+    return True
 #-----------------------
