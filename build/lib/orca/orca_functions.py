@@ -395,40 +395,57 @@ def get_task_info(token, record_id = None, transposed = False, timepoint='orca_4
 #-----------------------
 
 #8-----------------------
-def get_movesense_numbers(token, record_id = None, timepoint = 'orca_4month_arm_1'):
+def get_movesense_times(token, record_id, who, timepoint='orca_4month_arm_1'):
     """
-    Pulls child and caregiver movesense device numbers for a given timepoint.
+    Pulls test recording times for each movesense device in order parent, child.
 
     Args:
         token (str): The API token for the project.
-        record_id (str): the record id you wish to pull (e.g. '218'). Default is 'none' and will pull the whole dataset
+        record_id (str): the record id you wish to pull (e.g. '218')
+        who (str): 'cg' or 'child' 
         timepoint (str): the redcap event name of the timepoint you wish to pull. Default is orca_4month_arm_1
 
     Returns:
-        pandas.DataFrame: A DataFrame with record id, child device number and caregiver device number. If a single record id is specified, will return cg device number first, then child
+        a character vector with the on time followed by off time
 
     """
     import requests
     import pandas as pd
     import io
+    from datetime import datetime
     import numpy as np
+    import pytz
 
     form_name = "visit_notes_" + timepoint[5:7]
     visit_notes = get_orca_data(token, form=form_name, form_complete=False, timepoint=timepoint)
-    child_column_name = [col for col in visit_notes.columns if 'hr_device_child' in col][0]
-    parent_column_name = [col for col in visit_notes.columns if 'hr_device_cg' in col][0]
+    child_on = [col for col in visit_notes.columns if 'child_movesense_on' in col][0]
+    child_off = [col for col in visit_notes.columns if 'child_movesense_off' in col][0]
+    parent_on = [col for col in visit_notes.columns if 'cg_movesense_on' in col][0]
+    parent_off = [col for col in visit_notes.columns if 'cg_movesense_off' in col][0]
 
-    if record_id != None:
-        visit_notes = visit_notes[visit_notes['record_id'] == record_id]
-        visit_notes.reset_index(drop=True, inplace=True)
-        child_number = str(int(visit_notes[child_column_name].iloc[0])) if not visit_notes[child_column_name].empty else np.nan
-        parent_number = str(int(visit_notes[parent_column_name].iloc[0])) if not visit_notes[parent_column_name].empty else np.nan
-        return parent_number, child_number
-    else:
-        visit_notes = visit_notes[['record_id', parent_column_name, child_column_name]]
-        visit_notes[parent_column_name] = visit_notes[parent_column_name].astype('Int64')
-        visit_notes[child_column_name] = visit_notes[child_column_name].astype('Int64')
-        return visit_notes
+    movesense_times = visit_notes[['record_id', parent_on,child_on, parent_off, child_off]]
+    movesense_times = movesense_times[movesense_times['record_id'] == record_id].reset_index(drop=True)
+
+    date = get_orca_field(token, field = "visit_date_"+timepoint[5:7])
+    date = date[date['record_id'] == record_id]
+    date = date[date['redcap_event_name'] == timepoint]
+    date = str(date["visit_date_"+timepoint[5:7]])
+    date = date.split()[1]
+
+    if who == 'cg':
+        on_time = str(movesense_times[parent_on]).split()[1]
+        off_time = str(movesense_times[parent_off]).split()[1]
+    elif who == 'child':
+        on_time = str(movesense_times[child_on]).split()[1]
+        off_time = str(movesense_times[child_off]).split()[1]
+
+    on_time = pd.to_datetime(date+ ' ' + on_time) if on_time != 'NaN' else np.nan
+    off_time = pd.to_datetime(date+ ' ' + off_time) if off_time != 'NaN' else np.nan
+
+    on_time = pytz.timezone('America/New_York').localize(on_time) if pd.notna(on_time) else pd.NaT
+    off_time = pytz.timezone('America/New_York').localize(off_time) if pd.notna(off_time) else pd.NaT
+
+    return on_time, off_time
 #-----------------------
 
 #9-----------------------
@@ -788,6 +805,7 @@ def checking_multiple_recordings(ecg_data, column_name = 'recording_id'):
 
     Returns:
         pandas.DataFrame: Your ecg_data filtered by user_response
+        cont (boolean): Whether to continue with processing. True if user_response not 0
     """
     import pandas as pd
     unique_recording_ids_n = ecg_data['recording_id'].nunique()
@@ -800,18 +818,26 @@ def checking_multiple_recordings(ecg_data, column_name = 'recording_id'):
             duration = max(test['timestamp_est_uncorrected']) - min(test['timestamp_est_uncorrected'])
             print("Start time for recording " + str(recording_id) + ": " + str(timestamp_value) + "; Duration: " + str(duration))
         print("\n")
-        user_response = input("Enter correct recording number here as an integer. If you do not know, enter '0' and then go away and check: ")   
+        user_response = input("Enter correct recording number here as an integer. If you want multiple included, list range like so: 1,4. If you do not know, enter '0' and then go away and check: ")   
 
         if user_response == '0':
             print("\n")
             print('dataset left unfiltered. Go and check the recording and then come back and filter')
+            cont = False
+        elif ',' in user_response:
+            start, end = map(int, user_response.split(','))
+            numeric_list = list(range(start, end + 1))
+            ecg_data = ecg_data[ecg_data['recording_id'].isin(numeric_list)]
+            cont = True
         else:
             ecg_data = ecg_data[ecg_data['recording_id'] == int(user_response)]
+            cont=True
 
     else:
         print('only one recording present in the dataset')
-    
-    return ecg_data
+        cont = True
+
+    return ecg_data, cont
 #-----------------------
 
 #5-----------------------
@@ -1672,4 +1698,107 @@ def check_freeplay_times(token, record_id, timepoint='orca_4month_arm_1'):
 
     print('no issues with freeplay timestamps!')
     return True
+#-----------------------
+
+#16-----------------------
+def calculate_ecg_timestamps_mult_recordings(ecg_data, start_time, end_time, sample_rate=256, method='start_time'):
+    """
+    Calculates timestamps of a time series ecg dataframe according to either the start time or end time, and sampling rate. Accommodates for multiple recordings within the file
+
+    Args:
+        ecg_data (pandas.DataFrame): 
+        start_time (datetime.datetime, optional): Datetime object of the start time of the ecg recording
+        end_time (datetime.datetime, optional): Datetime object of the end time of the ecg recording
+        sample_rate (int): Sampling rate of your ecg recording. Default is 256
+        method (str): whether to use the 'start_time' or 'end_time'
+
+    Returns:
+        pandas.DataFrame: Your original ecg dataframe with a column 'timestamp_est_corrected' reflecting the new timestamps
+        timedelta object: Number or seconds different between the new end_time of timestamp_est_corrected and the end_time provided. Only returned if both start_time and end_time != None
+    """
+    from datetime import datetime, timedelta
+    import pandas as pd
+    #creating aggregate df for start and end of each recording
+    recording_times = (
+        ecg_data.groupby('recording_id', as_index=False)
+        .agg(start_time=('timestamp_est_uncorrected', 'min'), end_time=('timestamp_est_uncorrected', 'max'))
+    )
+    recording_times['duration'] = recording_times['end_time'] - recording_times['start_time']
+
+    if method == 'start_time':
+        for i, rec_n in enumerate(recording_times['recording_id']):
+            if rec_n == 1:
+                #for first recording id, set recording start as the start_time parameter 
+                elapsed = np.nan
+                recording_start = start_time
+            elif rec_n > 1:
+                last_subset = ecg_data[ecg_data['recording_id'] < rec_n]
+                last_duration = max(last_subset['timestamp_est_corrected']) - min(last_subset['timestamp_est_corrected'])
+                current_jump = recording_times['start_time'].iloc[i] - recording_times['end_time'].iloc[i-1]
+
+                elapsed = last_duration + current_jump
+                recording_start = start_time + elapsed
+
+            #subsetting original data by recording id, calculating timestamps based on new start time, and appending back to larger df
+            ecg_subset = ecg_data[ecg_data['recording_id'] == rec_n]
+            ecg_subset, moe = calculate_ecg_timestamps(ecg_subset, start_time=recording_start, end_time=np.nan, sample_rate=256)
+
+            ecg_data.loc[ecg_subset.index, 'timestamp_est_corrected'] = ecg_subset['timestamp_est_corrected']
+
+        #if end time present, the new end time is compared to expected end time and 'margin of error' calculated
+        if pd.notna(end_time):
+            new_max = max(ecg_data['timestamp_est_corrected'])
+            margin_of_error = abs(end_time-new_max)
+            #setting threshold for MOE check
+            threshold = timedelta(seconds = 1)
+            #if MOE is less than 1s, ecg data & moe is returned. If it is more, they are returned with warning to check the file
+            if margin_of_error < threshold:
+                print('Successfully corrected timestamps for this file')
+                return ecg_data, margin_of_error
+            else:
+                print('There is more than a 1 second difference between the last sample and expected last sample. Check!')
+                return ecg_data, margin_of_error
+        else:
+            margin_of_error = None
+            print('No margin of error can be returned as only start time was provided')
+            return ecg_data, margin_of_error
+            
+    elif method == 'end_time':
+        for i, rec_n in enumerate(reversed(recording_times['recording_id'])):
+            i = len(recording_times['recording_id']) - 1 - i
+            if rec_n == max(recording_times['recording_id']):
+                #for first recording id, set recording start as the start_time parameter 
+                elapsed = np.nan
+                recording_end = end_time
+            elif rec_n < max(recording_times['recording_id']):
+                last_subset = ecg_data[ecg_data['recording_id'] > rec_n]
+
+                last_duration = max(last_subset['timestamp_est_corrected']) - min(last_subset['timestamp_est_corrected'])
+                current_jump =  recording_times['start_time'].iloc[i+1] - recording_times['end_time'].iloc[i]
+
+                elapsed = last_duration + current_jump
+                recording_end = end_time - elapsed
+            
+            #subsetting original data by recording id, calculating timestamps based on new start time, and appending back to larger df
+            ecg_subset = ecg_data[ecg_data['recording_id'] == rec_n]
+            ecg_subset, moe = calculate_ecg_timestamps(ecg_subset, start_time=np.nan, end_time=recording_end, sample_rate=256)
+
+            ecg_data.loc[ecg_subset.index, 'timestamp_est_corrected'] = ecg_subset['timestamp_est_corrected']
+        
+        if pd.notna(start_time):
+            new_min = min(ecg_data['timestamp_est_corrected'])
+            margin_of_error = abs(start_time-new_max)
+            #setting threshold for MOE check
+            threshold = timedelta(seconds = 1)
+            #if MOE is less than 1s, ecg data & moe is returned. If it is more, they are returned with warning to check the file
+            if margin_of_error < threshold:
+                print('Successfully corrected timestamps for this file')
+                return ecg_data, margin_of_error
+            else:
+                print('There is more than a 1 second difference between the first sample and expected first sample. Check!')
+                return ecg_data, margin_of_error
+        else:
+            margin_of_error = None
+            print('No margin of error can be returned as only end time was provided')
+            return ecg_data, margin_of_error
 #-----------------------
