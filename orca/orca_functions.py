@@ -1698,6 +1698,7 @@ def calculate_ecg_timestamps_mult_recordings(ecg_data, start_time, end_time, sam
     """
     from datetime import datetime, timedelta
     import pandas as pd
+    import numpy as np
     #creating aggregate df for start and end of each recording
     recording_times = (
         ecg_data.groupby('recording_id', as_index=False)
