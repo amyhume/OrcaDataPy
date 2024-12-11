@@ -395,57 +395,37 @@ def get_task_info(token, record_id = None, transposed = False, timepoint='orca_4
 #-----------------------
 
 #8-----------------------
-def get_movesense_times(token, record_id, who, timepoint='orca_4month_arm_1'):
+def get_movesense_numbers(token, record_id = None, timepoint = 'orca_4month_arm_1'):
     """
-    Pulls test recording times for each movesense device in order parent, child.
-
+    Pulls child and caregiver movesense device numbers for a given timepoint.
     Args:
         token (str): The API token for the project.
-        record_id (str): the record id you wish to pull (e.g. '218')
-        who (str): 'cg' or 'child' 
+        record_id (str): the record id you wish to pull (e.g. '218'). Default is 'none' and will pull the whole dataset
         timepoint (str): the redcap event name of the timepoint you wish to pull. Default is orca_4month_arm_1
-
     Returns:
-        a character vector with the on time followed by off time
-
+        pandas.DataFrame: A DataFrame with record id, child device number and caregiver device number. If a single record id is specified, will return cg device number first, then child
     """
     import requests
     import pandas as pd
     import io
-    from datetime import datetime
     import numpy as np
-    import pytz
 
     form_name = "visit_notes_" + timepoint[5:7]
     visit_notes = get_orca_data(token, form=form_name, form_complete=False, timepoint=timepoint)
-    child_on = [col for col in visit_notes.columns if 'child_movesense_on' in col][0]
-    child_off = [col for col in visit_notes.columns if 'child_movesense_off' in col][0]
-    parent_on = [col for col in visit_notes.columns if 'cg_movesense_on' in col][0]
-    parent_off = [col for col in visit_notes.columns if 'cg_movesense_off' in col][0]
+    child_column_name = [col for col in visit_notes.columns if 'hr_device_child' in col][0]
+    parent_column_name = [col for col in visit_notes.columns if 'hr_device_cg' in col][0]
 
-    movesense_times = visit_notes[['record_id', parent_on,child_on, parent_off, child_off]]
-    movesense_times = movesense_times[movesense_times['record_id'] == record_id].reset_index(drop=True)
-
-    date = get_orca_field(token, field = "visit_date_"+timepoint[5:7])
-    date = date[date['record_id'] == record_id]
-    date = date[date['redcap_event_name'] == timepoint]
-    date = str(date["visit_date_"+timepoint[5:7]])
-    date = date.split()[1]
-
-    if who == 'cg':
-        on_time = str(movesense_times[parent_on]).split()[1]
-        off_time = str(movesense_times[parent_off]).split()[1]
-    elif who == 'child':
-        on_time = str(movesense_times[child_on]).split()[1]
-        off_time = str(movesense_times[child_off]).split()[1]
-
-    on_time = pd.to_datetime(date+ ' ' + on_time) if on_time != 'NaN' else np.nan
-    off_time = pd.to_datetime(date+ ' ' + off_time) if off_time != 'NaN' else np.nan
-
-    on_time = pytz.timezone('America/New_York').localize(on_time) if pd.notna(on_time) else pd.NaT
-    off_time = pytz.timezone('America/New_York').localize(off_time) if pd.notna(off_time) else pd.NaT
-
-    return on_time, off_time
+    if record_id != None:
+        visit_notes = visit_notes[visit_notes['record_id'] == record_id]
+        visit_notes.reset_index(drop=True, inplace=True)
+        child_number = str(int(visit_notes[child_column_name].iloc[0])) if not visit_notes[child_column_name].empty else np.nan
+        parent_number = str(int(visit_notes[parent_column_name].iloc[0])) if not visit_notes[parent_column_name].empty else np.nan
+        return parent_number, child_number
+    else:
+        visit_notes = visit_notes[['record_id', parent_column_name, child_column_name]]
+        visit_notes[parent_column_name] = visit_notes[parent_column_name].astype('Int64')
+        visit_notes[child_column_name] = visit_notes[child_column_name].astype('Int64')
+        return visit_notes
 #-----------------------
 
 #9-----------------------
