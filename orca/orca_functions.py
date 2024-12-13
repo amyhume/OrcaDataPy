@@ -1179,6 +1179,7 @@ def clean_video_times(file, id, visit_date, timepoint = 4):
     import pytz
     from datetime import timedelta
     import numpy as np
+    from IPython.display import display
 
     #reading csv
     times_csv = pd.read_csv(file)
