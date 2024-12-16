@@ -1709,11 +1709,11 @@ def calculate_ecg_timestamps_mult_recordings(ecg_data, start_time, end_time, sam
 
     if method == 'start_time':
         for i, rec_n in enumerate(recording_times['recording_id']):
-            if rec_n == 1:
+            if rec_n == min(recording_times['recording_id']):
                 #for first recording id, set recording start as the start_time parameter 
                 elapsed = np.nan
                 recording_start = start_time
-            elif rec_n > 1:
+            elif rec_n > min(recording_times['recording_id']):
                 last_subset = ecg_data[ecg_data['recording_id'] < rec_n]
                 last_duration = max(last_subset['timestamp_est_corrected']) - min(last_subset['timestamp_est_corrected'])
                 current_jump = recording_times['start_time'].iloc[i] - recording_times['end_time'].iloc[i-1]
@@ -1769,7 +1769,7 @@ def calculate_ecg_timestamps_mult_recordings(ecg_data, start_time, end_time, sam
         
         if pd.notna(start_time):
             new_min = min(ecg_data['timestamp_est_corrected'])
-            margin_of_error = abs(start_time-new_max)
+            margin_of_error = abs(start_time-new_min)
             #setting threshold for MOE check
             threshold = timedelta(seconds = 1)
             #if MOE is less than 1s, ecg data & moe is returned. If it is more, they are returned with warning to check the file
