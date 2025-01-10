@@ -1500,7 +1500,7 @@ def peach_ema_data_pull(token, data_type=None):
 
             survey_info = pd.concat([survey_info, survey_info_id], ignore_index=True)
             mean_data = pd.concat([mean_data, mean_data_id], ignore_index=True)
-            last_data = pd.concat([last_data, last_data_id], ignore_index=False)
+            last_data = pd.concat([last_data, last_data_id], ignore_index=True)
 
     data_map = {
         'survey_info': survey_info,
