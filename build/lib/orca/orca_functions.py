@@ -742,8 +742,12 @@ def segment_full_ecg(ecg_file, marker_column, start_marker, end_marker):
     
 
     if segmented_signals is not None:
-        segmented_signals['timestamp_relative'] = (segmented_signals['timestamp_est_corrected'] - segmented_signals['timestamp_est_corrected'].min()).dt.total_seconds()
-        return segmented_signals
+        if len(segmented_signals) > 4:
+            segmented_signals['timestamp_relative'] = (segmented_signals['timestamp_est_corrected'] - segmented_signals['timestamp_est_corrected'].min()).dt.total_seconds()
+            return segmented_signals
+        else:
+            empty_data = pd.DataFrame(columns=[])
+            return empty_data    
     else:
         empty_data = pd.DataFrame(columns=[])
         return empty_data
@@ -821,7 +825,7 @@ def checking_multiple_recordings(ecg_data, column_name = 'recording_id'):
 #-----------------------
 
 #5-----------------------
-def calculate_ecg_timestamps(ecg_data, start_time, end_time, sample_rate=256):
+def calculate_ecg_timestamps(ecg_data, start_time, end_time, sample_rate=256, method = 'start_time'):
     """
     Calculates timestamps of a time series ecg dataframe according to either the start time or end time, and sampling rate
 
@@ -830,6 +834,7 @@ def calculate_ecg_timestamps(ecg_data, start_time, end_time, sample_rate=256):
         start_time (datetime.datetime, optional): Datetime object of the start time of the ecg recording
         end_time (datetime.datetime, optional): Datetime object of the end time of the ecg recording
         sample_rate (int): Sampling rate of your ecg recording. Default is 256
+        method (str): whether to use the 'start_time' or 'end_time'
 
     Returns:
         pandas.DataFrame: Your original ecg dataframe with a column 'timestamp_est_corrected' reflecting the new timestamps
@@ -843,14 +848,50 @@ def calculate_ecg_timestamps(ecg_data, start_time, end_time, sample_rate=256):
     duration = num_samples / sample_rate
     time_increment_per_sample = duration / num_samples
 
-    #Calculating timestamps based on num_samples, sample_rate and start time
-    if pd.notna(start_time):
+    if method == 'start_time':
         timestamps = [start_time + i * timedelta(seconds=time_increment_per_sample) for i in range(num_samples)]
         ecg_data['timestamp_est_corrected'] = timestamps
-    #if there is no start time, only end time, end time will be used and timestamp calculated backwards
-    elif pd.isna(start_time) and pd.notna(end_time):
+
+        #if both start and end time present, the new end time is compared to expected end time and 'margin of error' calculated
+        if pd.notna(end_time):
+            new_max = max(ecg_data['timestamp_est_corrected'])
+            margin_of_error = abs(end_time-new_max)
+            #setting threshold for MOE check
+            threshold = timedelta(seconds = 1)
+            #if MOE is less than 1s, ecg data & moe is returned. If it is more, they are returned with warning to check the file
+            if margin_of_error < threshold:
+                print('Successfully corrected timestamps for this file')
+                return ecg_data, margin_of_error
+            else:
+                print('There is more than a 1 second difference between the last sample and expected last sample. Check!')
+                return ecg_data, margin_of_error
+        else:
+            margin_of_error = None
+            print('No margin of error can be returned as only start time or end time was provided')
+            return ecg_data, margin_of_error
+    elif method == 'end_time':
         timestamps = [end_time - (num_samples - i) * timedelta(seconds=time_increment_per_sample) for i in range(num_samples)]
         ecg_data['timestamp_est_corrected'] = timestamps
+
+        if pd.notna(start_time):
+            new_min = min(ecg_data['timestamp_est_corrected'])
+            margin_of_error = abs(start_time-new_min)
+            #setting threshold for MOE check
+            threshold = timedelta(seconds = 1)
+            #if MOE is less than 1s, ecg data & moe is returned. If it is more, they are returned with warning to check the file
+            if margin_of_error < threshold:
+                print('Successfully corrected timestamps for this file')
+                return ecg_data, margin_of_error
+            else:
+                print('There is more than a 1 second difference between the first sample and expected first sample. Check!')
+                return ecg_data, margin_of_error
+        else:
+            margin_of_error = None
+            print('No margin of error can be returned as only end time was provided')
+            return ecg_data, margin_of_error
+
+
+
     
     #if both start and end time present, the new end time is compared to expected end time and 'margin of error' calculated
     if pd.notna(start_time) and pd.notna(end_time):
@@ -1179,6 +1220,7 @@ def clean_video_times(file, id, visit_date, timepoint = 4):
     import pytz
     from datetime import timedelta
     import numpy as np
+    from IPython.display import display
 
     #reading csv
     times_csv = pd.read_csv(file)
@@ -1495,7 +1537,7 @@ def peach_ema_data_pull(token, data_type=None):
 
             survey_info = pd.concat([survey_info, survey_info_id], ignore_index=True)
             mean_data = pd.concat([mean_data, mean_data_id], ignore_index=True)
-            last_data = pd.concat([last_data, last_data_id], ignore_index=False)
+            last_data = pd.concat([last_data, last_data_id], ignore_index=True)
 
     data_map = {
         'survey_info': survey_info,
@@ -1698,6 +1740,7 @@ def calculate_ecg_timestamps_mult_recordings(ecg_data, start_time, end_time, sam
     """
     from datetime import datetime, timedelta
     import pandas as pd
+    import numpy as np
     #creating aggregate df for start and end of each recording
     recording_times = (
         ecg_data.groupby('recording_id', as_index=False)
@@ -1707,11 +1750,11 @@ def calculate_ecg_timestamps_mult_recordings(ecg_data, start_time, end_time, sam
 
     if method == 'start_time':
         for i, rec_n in enumerate(recording_times['recording_id']):
-            if rec_n == 1:
+            if rec_n == min(recording_times['recording_id']):
                 #for first recording id, set recording start as the start_time parameter 
                 elapsed = np.nan
                 recording_start = start_time
-            elif rec_n > 1:
+            elif rec_n > min(recording_times['recording_id']):
                 last_subset = ecg_data[ecg_data['recording_id'] < rec_n]
                 last_duration = max(last_subset['timestamp_est_corrected']) - min(last_subset['timestamp_est_corrected'])
                 current_jump = recording_times['start_time'].iloc[i] - recording_times['end_time'].iloc[i-1]
@@ -1767,7 +1810,7 @@ def calculate_ecg_timestamps_mult_recordings(ecg_data, start_time, end_time, sam
         
         if pd.notna(start_time):
             new_min = min(ecg_data['timestamp_est_corrected'])
-            margin_of_error = abs(start_time-new_max)
+            margin_of_error = abs(start_time-new_min)
             #setting threshold for MOE check
             threshold = timedelta(seconds = 1)
             #if MOE is less than 1s, ecg data & moe is returned. If it is more, they are returned with warning to check the file
