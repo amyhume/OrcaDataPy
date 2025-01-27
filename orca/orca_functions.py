@@ -1218,7 +1218,7 @@ def clean_video_times(file, id, visit_date, timepoint = 4):
     import os
     import pandas as pd
     import pytz
-    from datetime import timedelta
+    from datetime import datetime, timedelta, date as dt
     import numpy as np
     from IPython.display import display
 
