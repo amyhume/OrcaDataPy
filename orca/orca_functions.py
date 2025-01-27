@@ -1295,8 +1295,11 @@ def clean_video_times(file, id, visit_date, timepoint = 4):
         
         times_data['Video2'] = times_data['Video2'].str.replace('Start', 'start_8m').str.replace('End', 'end_8m')
 
+        times_data['Time'] = pd.to_datetime(visit_date + ' ' + times_data['Time'], utc=True)
         times_data['Time'] = times_data['Time'].dt.tz_convert('America/New_York').dt.strftime('%H:%M:%S')
         times_data['Time']
+
+
     elif timepoint == 12:
         return '12m option not set up for this function just yet!'
 
