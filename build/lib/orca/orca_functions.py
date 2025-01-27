@@ -1227,31 +1227,89 @@ def clean_video_times(file, id, visit_date, timepoint = 4):
     times_data = times_csv.melt(id_vars=['data:text/csv;charset=utf-8'], var_name='Video', value_name='Time')
     times_data['Video2'] = times_data['Video'] + "_" + times_data.iloc[:, 0]
 
-    #renaming to redcap field names
-    times_data['Video2'] = times_data['Video2'].str.replace('Video1', 'richards').str.replace('Video2', 'vpc').str.replace('Video3', 'srt').str.replace('Video4', 'cecile').str.replace('Video5', 'relational_memory')
-    times_data['Video2'] = times_data['Video2'].str.replace('Start', 'start_4m').str.replace('End', 'end_4m')
+    fp_order2_date = datetime.strptime('2024-11-20', '%Y-%m-%d')
+    visit_date2 = datetime.strptime(visit_date, '%Y-%m-%d')
 
-    times_data['Time'] = pd.to_datetime(visit_date + ' ' + times_data['Time'], utc=True)
-    times_data['Time'] = times_data['Time'].dt.tz_convert('America/New_York').dt.strftime('%H:%M:%S')
-    times_data['Time']
+    fp_order = 1 if visit_date2 < fp_order2_date else 0
 
-    display(times_data)
-    user_response = input("Check the times in the displayed dataset. Enter 'N' to terminate or 'Y' to continue: ") 
+    if timepoint == 4:
+        #renaming to redcap field names
+        times_data['Video2'] = times_data['Video2'].str.replace('Video1', 'richards').str.replace('Video2', 'vpc').str.replace('Video3', 'srt').str.replace('Video4', 'cecile').str.replace('Video5', 'relational_memory')
+        times_data['Video2'] = times_data['Video2'].str.replace('Start', 'start_4m').str.replace('End', 'end_4m')
 
-    if user_response.lower() == 'n':
-        print("\n")
-        print('Process aborted. Try again')
-    elif user_response.lower() == 'y':
-        times_data = times_data[['Video2', 'Time']]
-        times_data = times_data.set_index('Video2').T
+        times_data['Time'] = pd.to_datetime(visit_date + ' ' + times_data['Time'], utc=True)
+        times_data['Time'] = times_data['Time'].dt.tz_convert('America/New_York').dt.strftime('%H:%M:%S')
+        times_data['Time']
+    elif timepoint == 8:
+        times_data['Time'] = pd.to_datetime(times_data['Time']).dt.tz_localize('UTC')
 
-        times_data['record_id'] = id
-        times_data['redcap_event_name'] = 'orca_4month_arm_1' if timepoint == 4 else 'orca_8month_arm_1'
+        #fixing pa_social
+        v4_start = times_data['Time'][times_data['Video2'] == 'Video4_Start'].iloc[0]
+        v4_end = times_data['Time'][times_data['Video2'] == 'Video4_End'].iloc[0]
+        v4_exp_max = timedelta(minutes=1, seconds = 14)
+        v4_exp_min = timedelta(minutes=1, seconds=8)
+        v4_dur = v4_end - v4_start
 
-        print("\n")
-        print('Video times data prepared for redcap import. check before importing')
+        if v4_dur < v4_exp_min or v4_dur > v4_exp_max:
+            print('duration of video 4 longer or shorter than expected. You may want to check times manually')
+            print(v4_dur)
 
-        return times_data
+        pa_start = v4_start
+        pa_end = v4_start + timedelta(minutes=0, seconds=39)
+        social_start = v4_start + timedelta(minutes=0, seconds=39)
+        social_end = v4_end
+
+
+        #fixing rel_cec
+        v5_start = times_data['Time'][times_data['Video2'] == 'Video5_Start'].iloc[0]
+        v5_end = times_data['Time'][times_data['Video2'] == 'Video5_End'].iloc[0]
+        v5_exp_max = timedelta(minutes=3, seconds = 3)
+        v5_exp_min = timedelta(minutes=2, seconds=57)
+        v5_dur = v5_end - v5_start
+
+        if v5_dur < v5_exp_min or v5_dur > v5_exp_max:
+            print('duration of video 5 longer or shorter than expected. You may want to check times manually')
+            print(v5_dur)
+        
+        rm_start = v5_start
+        rm_end = v5_start + timedelta(minutes=1, seconds=40)
+        cecile_start = v5_start + timedelta(minutes=1, seconds=40)
+        cecile_end = v5_end
+
+        extra_vid_times = pd.DataFrame({
+            'Video': ['Video4', 'Video4', 'Video5', 'Video5', 'Video6', 'Video6', 'Video7', 'Video7'],
+            'Time': [pa_start, pa_end, social_start, social_end, rm_start, rm_end, cecile_start, cecile_end],
+            'Video2': ['Video4_Start', 'Video4_End', 'Video5_Start', 'Video5_End', 'Video6_Start', 'Video6_End', 'Video7_Start', 'Video7_End']
+            })
+        
+        times_data = times_data[times_data['Video'] != 'Video5']
+        times_data = times_data[times_data['Video'] != 'Video4']
+        times_data = pd.concat([times_data, extra_vid_times], ignore_index=True)
+
+        #Cleaning 8m Field Names
+        times_data['Video2'] = times_data['Video2'].str.replace('Video1', 'richards').str.replace('Video2', 'vpc').str.replace('Video3', 'srt').str.replace('Video4', 'pa').str.replace('Video5', 'social').str.replace('Video6', 'relational_memory').str.replace('Video7', 'cecile')
+        if fp_order == 1:
+            times_data['Video2'] = times_data['Video2'].str.replace('Freeplay_NoBook_Start', 'notoy_start_real_8m').str.replace('Freeplay_Book_Start', 'toy_start_real_8m').str.replace('Freeplay_NoBook_End', 'notoy_end_real_8m').str.replace('Freeplay_Book_End', 'toy_end_real_8m')
+        elif fp_order == 2:
+            times_data['Video2'] = times_data['Video2'].str.replace('Freeplay_NoBook_Start', 'toy_start_real_8m').str.replace('Freeplay_Book_Start', 'notoy_start_real_8m').str.replace('Freeplay_NoBook_End', 'toy_end_real_8m').str.replace('Freeplay_Book_End', 'notoy_end_real_8m')
+        
+        times_data['Video2'] = times_data['Video2'].str.replace('Start', 'start_8m').str.replace('End', 'end_8m')
+
+        times_data['Time'] = times_data['Time'].dt.tz_convert('America/New_York').dt.strftime('%H:%M:%S')
+        times_data['Time']
+    elif timepoint == 12:
+        return '12m option not set up for this function just yet!'
+
+    times_data = times_data[['Video2', 'Time']]
+    times_data = times_data.set_index('Video2').T
+
+    times_data['record_id'] = id
+    times_data['redcap_event_name'] = 'orca_4month_arm_1' if timepoint == 4 else 'orca_8month_arm_1'
+
+    print("\n")
+    print('Video times data prepared for redcap import. check before importing')
+
+    return times_data
 #-----------------------
 
 #10-----------------------
@@ -1363,7 +1421,7 @@ def overlay_real_time(video_path,output_path, start_time):
         
             #calculate the current timestamp based on frame position
             frame_index = int(cap.get(cv2.CAP_PROP_POS_FRAMES))
-            current_time = device_on_start + timedelta(seconds=frame_index / fps)
+            current_time = start_time + timedelta(seconds=frame_index / fps)
 
             #format timestamp and overlay on video frame
             timestamp_str = current_time.strftime("%H:%M:%S.%f")[:-3]  # Shows to milliseconds
@@ -1824,4 +1882,39 @@ def calculate_ecg_timestamps_mult_recordings(ecg_data, start_time, end_time, sam
             margin_of_error = None
             print('No margin of error can be returned as only end time was provided')
             return ecg_data, margin_of_error
+#-----------------------
+
+#17-----------------------
+def clean_hr_times(file):
+    """
+    Reads video times csv from OWLET, converts to eastern time and formats into redcap-compatible format for data import
+
+    Args:
+        file (str): The file path for video times csv
+    Returns:
+        hr_on_start (str): string of start time for hr on video
+        hr_off_start (str): string of start time for hr off video
+    """
+    import os
+    import pandas as pd
+    import pytz
+    from datetime import timedelta
+    import numpy as np
+    from IPython.display import display
+
+    #reading csv
+    times_csv = pd.read_csv(file)
+    times_data = times_csv.melt(id_vars=['data:text/csv;charset=utf-8'], var_name='Video', value_name='Time')
+    times_data['Video2'] = times_data['Video'] + "_" + times_data.iloc[:, 0]
+
+    times_data['Time'] = pd.to_datetime(times_data['Time']).dt.tz_localize('UTC')
+
+    times_data['Time'] = times_data['Time'].dt.tz_convert('America/New_York').dt.strftime('%H:%M:%S.%f')
+    times_data = times_data[['Video2', 'Time']]
+    times_data = times_data.set_index('Video2').T
+
+    hr_on_start = times_data['HR_Device_On_Start'].iloc[0]
+    hr_off_start = times_data['HR_Device_Off_Start'].iloc[0]
+
+    return hr_on_start, hr_off_start
 #-----------------------
