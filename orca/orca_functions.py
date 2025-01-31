@@ -382,13 +382,15 @@ def get_task_info(token, record_id = None, transposed = False, timepoint='orca_4
     import io
 
     task_completion = get_task_completion(token, record_id, transposed, timepoint)
-    if mp4_times:
+
+    if mp4_times and timepoint == 'orca_4month_arm_1':
         task_timestamps, mp4_fp_timestamps = get_task_timestamps(token, record_id, transposed, timepoint, mp4_times)
     else:
         task_timestamps = get_task_timestamps(token, record_id, transposed, timepoint, mp4_times)
+
     task_data = get_task_data(token, record_id, transposed, timepoint)
 
-    if mp4_times:
+    if mp4_times and timepoint == 'orca_4month_arm_1':
         return task_completion, task_data, task_timestamps, mp4_fp_timestamps
     else:
         return task_completion, task_data, task_timestamps
