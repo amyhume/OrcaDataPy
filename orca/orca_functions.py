@@ -178,6 +178,7 @@ def get_task_timestamps(token, record_id = None, transposed = False, timepoint =
     import pandas as pd
     import io
     import pytz
+
     if timepoint == 'orca_4month_arm_1':
         visit_notes = get_orca_data(token, form = "visit_notes_4m", timepoint=timepoint,form_complete=False)
 
@@ -225,9 +226,9 @@ def get_task_timestamps(token, record_id = None, transposed = False, timepoint =
             visit_date = str(visit_notes['visit_date_8m'])
             visit_date = visit_date.split()[1]
 
-            markers = visit_notes[['richards_start_8m', 'richards_end_8m', 'vpc_start_8m', 'vpc_end_8m','srt_start_8m', 'srt_end_8m', 'pa_start_8m', 'pa_end_8m','relational_memory_start_8m', 'relational_memory_end_8m','cecile_start_8m', 'cecile_end_8m', 'notoy_start_real_8m','notoy_end_real_8m', 'toy_start_real_8m', 'toy_end_real_8m']]
+            markers = visit_notes[['richards_start_8m', 'richards_end_8m', 'vpc_start_8m', 'vpc_end_8m','srt_start_8m', 'srt_end_8m', 'pa_start_8m', 'pa_end_8m', 'social_start_8m', 'social_end_8m', 'relational_memory_start_8m', 'relational_memory_end_8m','cecile_start_8m', 'cecile_end_8m', 'notoy_start_real_8m','notoy_end_real_8m', 'toy_start_real_8m', 'toy_end_real_8m']]
         else:
-            markers = visit_notes[['record_id','richards_start_8m', 'richards_end_8m', 'vpc_start_8m', 'vpc_end_8m','srt_start_8m', 'srt_end_8m', 'pa_start_8m', 'pa_end_8m','relational_memory_start_8m', 'relational_memory_end_8m','cecile_start_8m', 'cecile_end_8m', 'notoy_start_real_8m','notoy_end_real_8m', 'toy_start_real_8m', 'toy_end_real_8m']]
+            markers = visit_notes[['record_id','richards_start_8m', 'richards_end_8m', 'vpc_start_8m', 'vpc_end_8m','srt_start_8m', 'srt_end_8m', 'pa_start_8m', 'pa_end_8m','social_start_8m', 'social_end_8m', 'relational_memory_start_8m', 'relational_memory_end_8m','cecile_start_8m', 'cecile_end_8m', 'notoy_start_real_8m','notoy_end_real_8m', 'toy_start_real_8m', 'toy_end_real_8m']]
         
         if transposed == True and record_id != None:
             markers = markers.transpose()
@@ -237,11 +238,10 @@ def get_task_timestamps(token, record_id = None, transposed = False, timepoint =
             markers['timestamp_est'] = pd.to_datetime(visit_date + ' ' + markers['timestamp_est'])
             markers = markers[['record_id', 'marker', 'timestamp_est']]
             markers['timestamp_est'] = markers['timestamp_est'].dt.tz_localize('America/New_York')  
-
         elif transposed == True and record_id == None:
             print('cannot transpose without selecting a record id')
 
-    if mp4_times == True:
+    if mp4_times:
         return markers, mp4_markers
     else:
         return markers
@@ -335,10 +335,10 @@ def get_task_completion(token, record_id = None, transposed = False, timepoint='
         if record_id != None:
             visit_notes = visit_notes[visit_notes['record_id'] == record_id]
             visit_notes.reset_index(drop=True, inplace=True)
-            task_comp = visit_notes[['richards_comp_8m', 'vpc_comp_8m', 'srt_comp_8m', 'pa_comp_8m','relational_memory_comp_8m', 'cecile_comp_8m', 'freeplay_comp_8m']]
-            whys = visit_notes[['richards_why_8m', 'vpc_why_8m', 'srt_why_8m', 'pa_why_8m','relational_memory_why_8m', 'cecile_why_8m', 'freeplay_why_8m']]
+            task_comp = visit_notes[['richards_comp_8m', 'vpc_comp_8m', 'srt_comp_8m', 'pa_comp_8m', 'social_comp_8m', 'relational_memory_comp_8m', 'cecile_comp_8m', 'freeplay_comp_8m']]
+            whys = visit_notes[['richards_why_8m', 'vpc_why_8m', 'srt_why_8m', 'pa_why_8m', 'social_why_8m', 'relational_memory_why_8m', 'cecile_why_8m', 'freeplay_why_8m']]
         else:
-            task_comp = visit_notes[['record_id','richards_comp_8m', 'richards_why_8m','vpc_comp_8m','vpc_why_8m', 'srt_comp_8m', 'srt_why_8m','pa_comp_8m', 'pa_why_8m','relational_memory_comp_8m', 'relational_memory_why_8m','cecile_comp_8m', 'cecile_why_8m','freeplay_comp_8m', 'freeplay_why_8m']]
+            task_comp = visit_notes[['record_id','richards_comp_8m', 'richards_why_8m','vpc_comp_8m','vpc_why_8m', 'srt_comp_8m', 'srt_why_8m','pa_comp_8m', 'pa_why_8m', 'social_comp_8m', 'social_why_8m', 'relational_memory_comp_8m', 'relational_memory_why_8m','cecile_comp_8m', 'cecile_why_8m','freeplay_comp_8m', 'freeplay_why_8m']]
 
     if transposed == True and record_id != None:
         task_comp = task_comp.transpose()
@@ -429,8 +429,6 @@ def get_movesense_numbers(token, record_id = None, timepoint = 'orca_4month_arm_
 #-----------------------
 
 #9-----------------------
-record_id = '209'
-timepoint = 'orca_4month_arm_1'
 def check_timestamps(token, record_id, timepoint='orca_4month_arm_1'):
     """
     Pulls task info, and checks to see if there's any incorrectly missing timestamps.
@@ -1919,4 +1917,85 @@ def clean_hr_times(file):
     hr_off_start = times_data['HR_Device_Off_Start'].iloc[0]
 
     return hr_on_start, hr_off_start
+#-----------------------
+
+#18-----------------------
+def overlay_time_ms(video_path,output_path):
+    """
+    Reads an mp4 file, and uses frame rate to overlay time in ms for each frame, and saves it to output path
+
+    Args:
+        video_path (str): The file path for mp4
+        output_path (str): The file path to save the new mp4
+    Returns:
+        Success / error message: Success message if mp4 is successfully saved
+    """
+        
+    import cv2
+    import pandas as pd
+    from datetime import datetime, timedelta
+
+    #Step 1: Try to load video
+    print('loading video...')
+    cap = cv2.VideoCapture(video_path)
+
+    if not cap.isOpened():
+        return "Error: could not open video file. Please check the video path"
+        exit()
+    print('Video file successfully opened')
+
+    # Step 2: Get frame rate
+    print('calculating frame rate...')
+    fps = cap.get(cv2.CAP_PROP_FPS)
+
+    if fps == 0:
+        print('Error: could not calculate frame rate. Process terminated')
+        exit()
+    print(f'Frame rate calculated: {fps:.2f} FPS')
+
+    # Step 3: Initialize output video writer
+    try:
+        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+        width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+        height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
+    except Exception as e:
+        return f"Error: could not initialize the video writer. {e}"
+        exit()
+
+    # Step 4: Process Frames
+    print('processing frame timestamps...')
+    try:
+        while cap.isOpened():
+            ret, frame = cap.read()
+            if not ret:
+                break
+        
+            # Get current frame index
+            frame_index = int(cap.get(cv2.CAP_PROP_POS_FRAMES))
+            
+            # Compute time in milliseconds
+            video_time_ms = int((frame_index / fps) * 1000)
+
+            # Format time as "milliseconds"
+            timestamp_str = f"{video_time_ms} ms"
+
+            # Overlay timestamp on frame
+            cv2.putText(frame, timestamp_str, (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2, cv2.LINE_AA)
+
+            # Write the frame
+            out.write(frame)
+
+    except Exception as e:
+        return f"Error: an error occurred while processing frames. {e}"
+
+    # Step 5: Release resources
+    try:
+        out.release()
+        cap.release()
+        cv2.destroyAllWindows()
+    except Exception as e:
+        return f"Error: Failed to release resources properly. {e}"
+
+    return f"Video processing complete! Saved output to {output_path}"
 #-----------------------
