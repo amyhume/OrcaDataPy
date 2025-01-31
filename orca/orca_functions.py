@@ -1290,7 +1290,7 @@ def clean_video_times(file, id, visit_date, timepoint = 4):
         times_data['Video2'] = times_data['Video2'].str.replace('Video1', 'richards').str.replace('Video2', 'vpc').str.replace('Video3', 'srt').str.replace('Video4', 'pa').str.replace('Video5', 'social').str.replace('Video6', 'relational_memory').str.replace('Video7', 'cecile')
         if fp_order == 1:
             times_data['Video2'] = times_data['Video2'].str.replace('Freeplay_NoBook_Start', 'notoy_start_real_8m').str.replace('Freeplay_Book_Start', 'toy_start_real_8m').str.replace('Freeplay_NoBook_End', 'notoy_end_real_8m').str.replace('Freeplay_Book_End', 'toy_end_real_8m')
-        elif fp_order == 2:
+        elif fp_order == 0:
             times_data['Video2'] = times_data['Video2'].str.replace('Freeplay_NoBook_Start', 'toy_start_real_8m').str.replace('Freeplay_Book_Start', 'notoy_start_real_8m').str.replace('Freeplay_NoBook_End', 'toy_end_real_8m').str.replace('Freeplay_Book_End', 'notoy_end_real_8m')
         
         times_data['Video2'] = times_data['Video2'].str.replace('Start', 'start_8m').str.replace('End', 'end_8m')
