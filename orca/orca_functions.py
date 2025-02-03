@@ -1532,72 +1532,76 @@ def peach_ema_data_pull(token, data_type=None):
         #next survey in queue
         current_dt = pd.to_datetime('today')
         future_surveys = id_timetable[id_timetable['survey_send_time'] > current_dt].reset_index(drop=True)
-        next_survey_name = future_surveys['survey_name'].iloc[future_surveys['survey_send_time'].idxmin()]
 
-        #% surveys complete / missing data 
-        past_surveys = id_timetable[id_timetable['survey_send_time'] < current_dt].reset_index(drop=True)
-        past_surveys['survey_complete'] = np.nan
+        if future_surveys.empty:
+            print('skipping ', id, ' - finished course of study')
+        else:
+            next_survey_name = future_surveys['survey_name'].iloc[future_surveys['survey_send_time'].idxmin()]
 
-        for i, survey in enumerate(past_surveys['survey_name']):
-            past_surveys.loc[i, 'survey_complete'] = 1 if survey in id_data['ema_survey'].values else 0
+            #% surveys complete / missing data 
+            past_surveys = id_timetable[id_timetable['survey_send_time'] < current_dt].reset_index(drop=True)
+            past_surveys['survey_complete'] = np.nan
 
-        surveys_complete_perc = sum(past_surveys['survey_complete'].values) / len(past_surveys) * 100
-        surveys_missed_perc = (past_surveys['survey_complete'] == 0).sum() / len(past_surveys) * 100
+            for i, survey in enumerate(past_surveys['survey_name']):
+                past_surveys.loc[i, 'survey_complete'] = 1 if survey in id_data['ema_survey'].values else 0
 
-        time_since_last_survey = (current_dt - pd.to_datetime(last_survey_date)).days
+            surveys_complete_perc = sum(past_surveys['survey_complete'].values) / len(past_surveys) * 100
+            surveys_missed_perc = (past_surveys['survey_complete'] == 0).sum() / len(past_surveys) * 100
 
-        #number days enrolled 
-        days_enrolled = (current_dt - id_timetable['survey_send_time'].min()).days
+            time_since_last_survey = (current_dt - pd.to_datetime(last_survey_date)).days
 
-        #Total Averages
-        mean_data_id = pd.DataFrame([{
-            'record_id':id,
-            'anxiety_mean_am': round(id_data['anxiety_am'].mean(), 2),
-            'anxiety_mean_pm': round(id_data['anxiety_pm'].mean(), 2),
-            'attention_mean_am': round(id_data['attention_am'].mean(), 2),
-            'attention_mean_pm': round(id_data['attention_pm'].mean(), 2),
-            'stress_mean_am': round(id_data['stress_am'].mean(), 2),
-            'stress_mean_pm': round(id_data['stress_pm'].mean(), 2),
-            'depression_mean_am': round(id_data['depression_am'].mean(), 2),
-            'depression_mean_pm': round(id_data['depression_pm'].mean(), 2),
-            'loneliness_mean_am': round(id_data['loneliness_am'].mean(), 2),
-        }])
+            #number days enrolled 
+            days_enrolled = (current_dt - id_timetable['survey_send_time'].min()).days
 
-        #Last Scores
-        last_survey_data = id_data[id_data['ema_survey'] == last_survey_name].reset_index(drop=True)
+            #Total Averages
+            mean_data_id = pd.DataFrame([{
+                'record_id':id,
+                'anxiety_mean_am': round(id_data['anxiety_am'].mean(), 2),
+                'anxiety_mean_pm': round(id_data['anxiety_pm'].mean(), 2),
+                'attention_mean_am': round(id_data['attention_am'].mean(), 2),
+                'attention_mean_pm': round(id_data['attention_pm'].mean(), 2),
+                'stress_mean_am': round(id_data['stress_am'].mean(), 2),
+                'stress_mean_pm': round(id_data['stress_pm'].mean(), 2),
+                'depression_mean_am': round(id_data['depression_am'].mean(), 2),
+                'depression_mean_pm': round(id_data['depression_pm'].mean(), 2),
+                'loneliness_mean_am': round(id_data['loneliness_am'].mean(), 2),
+            }])
 
-        last_data_id = pd.DataFrame([{
-            'record_id':id,
-            'last_survey_date': last_survey_date,
-            'last_survey': last_survey_name, 
-            'anxiety_last': last_survey_data['anxiety_' + last_survey_am_pm].iloc[0],
-            'attention_last': last_survey_data['attention_' + last_survey_am_pm].iloc[0],
-            'stress_last': last_survey_data['stress_' + last_survey_am_pm].iloc[0],
-            'depression_last': last_survey_data['depression_' + last_survey_am_pm].iloc[0],
-            'loneliness_last': last_survey_data['loneliness_' + last_survey_am_pm].iloc[0] if last_survey_am_pm == 'am' else np.nan,
-            'comment_last': last_survey_data['ema_comments'].iloc[0]
-        }])
+            #Last Scores
+            last_survey_data = id_data[id_data['ema_survey'] == last_survey_name].reset_index(drop=True)
 
-        #MAX Scores 
-        #survey_info_data 
+            last_data_id = pd.DataFrame([{
+                'record_id':id,
+                'last_survey_date': last_survey_date,
+                'last_survey': last_survey_name, 
+                'anxiety_last': last_survey_data['anxiety_' + last_survey_am_pm].iloc[0],
+                'attention_last': last_survey_data['attention_' + last_survey_am_pm].iloc[0],
+                'stress_last': last_survey_data['stress_' + last_survey_am_pm].iloc[0],
+                'depression_last': last_survey_data['depression_' + last_survey_am_pm].iloc[0],
+                'loneliness_last': last_survey_data['loneliness_' + last_survey_am_pm].iloc[0] if last_survey_am_pm == 'am' else np.nan,
+                'comment_last': last_survey_data['ema_comments'].iloc[0]
+            }])
 
-        survey_info_id = pd.DataFrame([{
-            'record_id': id,
-            'todays_date': current_dt.round('S'),
-            'last_survey': last_survey_name,
-            'last_survey_date': last_survey_date,
-            'next_survey': next_survey_name,
-            'days_enrolled': days_enrolled,
-            'surveys_complete_perc': round(surveys_complete_perc, 2),
-            'missed_surveys_flag': True if time_since_last_survey >= 7 else False
-        }])
+            #MAX Scores 
+            #survey_info_data 
 
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore", FutureWarning)
+            survey_info_id = pd.DataFrame([{
+                'record_id': id,
+                'todays_date': current_dt.round('S'),
+                'last_survey': last_survey_name,
+                'last_survey_date': last_survey_date,
+                'next_survey': next_survey_name,
+                'days_enrolled': days_enrolled,
+                'surveys_complete_perc': round(surveys_complete_perc, 2),
+                'missed_surveys_flag': True if time_since_last_survey >= 7 else False
+            }])
 
-            survey_info = pd.concat([survey_info, survey_info_id], ignore_index=True)
-            mean_data = pd.concat([mean_data, mean_data_id], ignore_index=True)
-            last_data = pd.concat([last_data, last_data_id], ignore_index=True)
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore", FutureWarning)
+
+                survey_info = pd.concat([survey_info, survey_info_id], ignore_index=True)
+                mean_data = pd.concat([mean_data, mean_data_id], ignore_index=True)
+                last_data = pd.concat([last_data, last_data_id], ignore_index=True)
 
     data_map = {
         'survey_info': survey_info,
