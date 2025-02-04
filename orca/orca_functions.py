@@ -615,6 +615,30 @@ def get_visit_datetime(token, record_id = None, merged = True, timepoint = 'orca
             data['visit_datetime_8m'] = data['visit_datetime_8m'].dt.tz_localize('America/New_York')
             value = data['visit_datetime_8m'].iloc[0]
             return value
+        
+    elif timepoint == 'orca_12month_arm_1':
+        visit_notes = get_orca_data(token, form = "visit_notes_12m", form_complete=False, timepoint=timepoint)
+        data = visit_notes[['record_id', 'visit_date_12m', 'visit_time_12m']]
+        data = data[data['visit_date_12m'].notna() | data['visit_time_12m'].notna()]
+
+        data['visit_date_12m'] = pd.to_datetime(data['visit_date_12m'])
+        data['visit_time_12m'] = pd.to_datetime(data['visit_time_12m'], format='%H:%M').dt.time
+
+        if record_id == None and merged == False:
+            return data
+        elif record_id == None and merged == True:
+            data['visit_datetime_12m'] = data['visit_date_12m'] + pd.to_timedelta(data['visit_time_12m'].astype(str))
+            data['visit_datetime_12m'] = data['visit_datetime_12m'].dt.tz_localize('America/New_York')
+            return data
+        elif record_id != None and merged == False:
+            data = data[data['record_id'] == record_id]
+            return data
+        elif record_id != None and merged == True:
+            data = data[data['record_id'] == record_id]
+            data['visit_datetime_12m'] = data['visit_date_12m'] + pd.to_timedelta(data['visit_time_12m'].astype(str))
+            data['visit_datetime_12m'] = data['visit_datetime_12m'].dt.tz_localize('America/New_York')
+            value = data['visit_datetime_12m'].iloc[0]
+            return value
 #-----------------------
 
 #12-----------------------
@@ -1300,13 +1324,73 @@ def clean_video_times(file, id, visit_date, timepoint = 4):
 
 
     elif timepoint == 12:
-        return '12m option not set up for this function just yet!'
+        times_data['Time'] = pd.to_datetime(visit_date + ' ' + times_data['Time'], utc=True)
+
+        #fixing pa_vpc
+        v4_start = times_data['Time'][times_data['Video2'] == 'Video4_Start'].iloc[0]
+        v4_end = times_data['Time'][times_data['Video2'] == 'Video4_End'].iloc[0]
+        v4_exp_max = timedelta(minutes=1, seconds = 25)
+        v4_exp_min = timedelta(minutes=1, seconds=20)
+        v4_dur = v4_end - v4_start
+
+        if v4_dur < v4_exp_min or v4_dur > v4_exp_max:
+            print('duration of video 4 longer or shorter than expected. You may want to check times manually')
+            print(v4_dur)
+
+        pa_start = v4_start
+        pa_end = v4_start + timedelta(minutes=0, seconds=39)
+        vpc_start = v4_start + timedelta(minutes=0, seconds=39)
+        vpc_end = v4_end
+
+        #fixing rel_cec
+        v5_start = times_data['Time'][times_data['Video2'] == 'Video5_Start'].iloc[0]
+        v5_end = times_data['Time'][times_data['Video2'] == 'Video5_End'].iloc[0]
+        v5_exp_max = timedelta(minutes=3, seconds = 3)
+        v5_exp_min = timedelta(minutes=2, seconds=57)
+        v5_dur = v5_end - v5_start
+
+        if v5_dur < v5_exp_min or v5_dur > v5_exp_max:
+            print('duration of video 5 longer or shorter than expected. You may want to check times manually')
+            print(v5_dur)
+        
+        rm_start = v5_start
+        rm_end = v5_start + timedelta(minutes=1, seconds=40)
+        cecile_start = v5_start + timedelta(minutes=1, seconds=40)
+        cecile_end = v5_end
+
+        extra_vid_times = pd.DataFrame({
+            'Video': ['Video4', 'Video4', 'Video5', 'Video5', 'Video6', 'Video6', 'Video7', 'Video7'],
+            'Time': [pa_start, pa_end, vpc_start, vpc_end, rm_start, rm_end, cecile_start, cecile_end],
+            'Video2': ['Video4_Start', 'Video4_End', 'Video5_Start', 'Video5_End', 'Video6_Start', 'Video6_End', 'Video7_Start', 'Video7_End']
+            })
+        
+        times_data = times_data[times_data['Video'] != 'Video5']
+        times_data = times_data[times_data['Video'] != 'Video4']
+        times_data = pd.concat([times_data, extra_vid_times], ignore_index=True)
+
+        #Cleaning 12m Field Names
+        times_data['Video2'] = times_data['Video2'].str.replace('Video1', 'richards').str.replace('Video2', 'gap').str.replace('Video3', 'srt').str.replace('Video4', 'pa').str.replace('Video5', 'vpc').str.replace('Video6', 'relational_memory').str.replace('Video7', 'cecile')
+        if fp_order == 1:
+            times_data['Video2'] = times_data['Video2'].str.replace('Freeplay_NoBook_Start', 'notoy_start_real_12m').str.replace('Freeplay_Book_Start', 'toy_start_real_12m').str.replace('Freeplay_NoBook_End', 'notoy_end_real_12m').str.replace('Freeplay_Book_End', 'toy_end_real_12m')
+        elif fp_order == 0:
+            times_data['Video2'] = times_data['Video2'].str.replace('Freeplay_NoBook_Start', 'toy_start_real_12m').str.replace('Freeplay_Book_Start', 'notoy_start_real_12m').str.replace('Freeplay_NoBook_End', 'toy_end_real_12m').str.replace('Freeplay_Book_End', 'notoy_end_real_12m')
+        
+        times_data['Video2'] = times_data['Video2'].str.replace('Start', 'start_12m').str.replace('End', 'end_12m')
+
+        times_data['Time'] = times_data['Time'].dt.tz_convert('America/New_York').dt.strftime('%H:%M:%S')
+        times_data['Time']
 
     times_data = times_data[['Video2', 'Time']]
     times_data = times_data.set_index('Video2').T
 
     times_data['record_id'] = id
-    times_data['redcap_event_name'] = 'orca_4month_arm_1' if timepoint == 4 else 'orca_8month_arm_1'
+
+    if timepoint == 4:
+        times_data['redcap_event_name'] = 'orca_4month_arm_1'
+    elif timepoint == 8:
+        times_data['redcap_event_name'] = 'orca_8month_arm_1'
+    elif timepoint == 12:
+        times_data['redcap_event_name'] = 'orca_12month_arm_1'
 
     print("\n")
     print('Video times data prepared for redcap import. check before importing')
@@ -1336,7 +1420,7 @@ def clean_survey_data(file, timepoint='4', study='orca'):
     survey_data = pd.read_csv(file)
 
     if study == 'orca':
-        if 'orca' not in survey_data['subject_id'][0]:
+        if 'orca' not in survey_data['subject_id'].iloc[0]:
             survey_data['empty_column'] = ''
             survey_data = survey_data.shift(axis=1)
             survey_data.iloc[:, 0] = survey_data.index
