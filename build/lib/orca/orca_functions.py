@@ -178,6 +178,7 @@ def get_task_timestamps(token, record_id = None, transposed = False, timepoint =
     import pandas as pd
     import io
     import pytz
+
     if timepoint == 'orca_4month_arm_1':
         visit_notes = get_orca_data(token, form = "visit_notes_4m", timepoint=timepoint,form_complete=False)
 
@@ -225,9 +226,9 @@ def get_task_timestamps(token, record_id = None, transposed = False, timepoint =
             visit_date = str(visit_notes['visit_date_8m'])
             visit_date = visit_date.split()[1]
 
-            markers = visit_notes[['richards_start_8m', 'richards_end_8m', 'vpc_start_8m', 'vpc_end_8m','srt_start_8m', 'srt_end_8m', 'pa_start_8m', 'pa_end_8m','relational_memory_start_8m', 'relational_memory_end_8m','cecile_start_8m', 'cecile_end_8m', 'notoy_start_real_8m','notoy_end_real_8m', 'toy_start_real_8m', 'toy_end_real_8m']]
+            markers = visit_notes[['richards_start_8m', 'richards_end_8m', 'vpc_start_8m', 'vpc_end_8m','srt_start_8m', 'srt_end_8m', 'pa_start_8m', 'pa_end_8m', 'social_start_8m', 'social_end_8m', 'relational_memory_start_8m', 'relational_memory_end_8m','cecile_start_8m', 'cecile_end_8m', 'notoy_start_real_8m','notoy_end_real_8m', 'toy_start_real_8m', 'toy_end_real_8m']]
         else:
-            markers = visit_notes[['record_id','richards_start_8m', 'richards_end_8m', 'vpc_start_8m', 'vpc_end_8m','srt_start_8m', 'srt_end_8m', 'pa_start_8m', 'pa_end_8m','relational_memory_start_8m', 'relational_memory_end_8m','cecile_start_8m', 'cecile_end_8m', 'notoy_start_real_8m','notoy_end_real_8m', 'toy_start_real_8m', 'toy_end_real_8m']]
+            markers = visit_notes[['record_id','richards_start_8m', 'richards_end_8m', 'vpc_start_8m', 'vpc_end_8m','srt_start_8m', 'srt_end_8m', 'pa_start_8m', 'pa_end_8m','social_start_8m', 'social_end_8m', 'relational_memory_start_8m', 'relational_memory_end_8m','cecile_start_8m', 'cecile_end_8m', 'notoy_start_real_8m','notoy_end_real_8m', 'toy_start_real_8m', 'toy_end_real_8m']]
         
         if transposed == True and record_id != None:
             markers = markers.transpose()
@@ -237,11 +238,10 @@ def get_task_timestamps(token, record_id = None, transposed = False, timepoint =
             markers['timestamp_est'] = pd.to_datetime(visit_date + ' ' + markers['timestamp_est'])
             markers = markers[['record_id', 'marker', 'timestamp_est']]
             markers['timestamp_est'] = markers['timestamp_est'].dt.tz_localize('America/New_York')  
-
         elif transposed == True and record_id == None:
             print('cannot transpose without selecting a record id')
 
-    if mp4_times == True:
+    if mp4_times:
         return markers, mp4_markers
     else:
         return markers
@@ -335,10 +335,10 @@ def get_task_completion(token, record_id = None, transposed = False, timepoint='
         if record_id != None:
             visit_notes = visit_notes[visit_notes['record_id'] == record_id]
             visit_notes.reset_index(drop=True, inplace=True)
-            task_comp = visit_notes[['richards_comp_8m', 'vpc_comp_8m', 'srt_comp_8m', 'pa_comp_8m','relational_memory_comp_8m', 'cecile_comp_8m', 'freeplay_comp_8m']]
-            whys = visit_notes[['richards_why_8m', 'vpc_why_8m', 'srt_why_8m', 'pa_why_8m','relational_memory_why_8m', 'cecile_why_8m', 'freeplay_why_8m']]
+            task_comp = visit_notes[['richards_comp_8m', 'vpc_comp_8m', 'srt_comp_8m', 'pa_comp_8m', 'social_comp_8m', 'relational_memory_comp_8m', 'cecile_comp_8m', 'freeplay_comp_8m']]
+            whys = visit_notes[['richards_why_8m', 'vpc_why_8m', 'srt_why_8m', 'pa_why_8m', 'social_why_8m', 'relational_memory_why_8m', 'cecile_why_8m', 'freeplay_why_8m']]
         else:
-            task_comp = visit_notes[['record_id','richards_comp_8m', 'richards_why_8m','vpc_comp_8m','vpc_why_8m', 'srt_comp_8m', 'srt_why_8m','pa_comp_8m', 'pa_why_8m','relational_memory_comp_8m', 'relational_memory_why_8m','cecile_comp_8m', 'cecile_why_8m','freeplay_comp_8m', 'freeplay_why_8m']]
+            task_comp = visit_notes[['record_id','richards_comp_8m', 'richards_why_8m','vpc_comp_8m','vpc_why_8m', 'srt_comp_8m', 'srt_why_8m','pa_comp_8m', 'pa_why_8m', 'social_comp_8m', 'social_why_8m', 'relational_memory_comp_8m', 'relational_memory_why_8m','cecile_comp_8m', 'cecile_why_8m','freeplay_comp_8m', 'freeplay_why_8m']]
 
     if transposed == True and record_id != None:
         task_comp = task_comp.transpose()
@@ -382,13 +382,15 @@ def get_task_info(token, record_id = None, transposed = False, timepoint='orca_4
     import io
 
     task_completion = get_task_completion(token, record_id, transposed, timepoint)
-    if mp4_times:
+
+    if mp4_times and timepoint == 'orca_4month_arm_1':
         task_timestamps, mp4_fp_timestamps = get_task_timestamps(token, record_id, transposed, timepoint, mp4_times)
     else:
         task_timestamps = get_task_timestamps(token, record_id, transposed, timepoint, mp4_times)
+
     task_data = get_task_data(token, record_id, transposed, timepoint)
 
-    if mp4_times:
+    if mp4_times and timepoint == 'orca_4month_arm_1':
         return task_completion, task_data, task_timestamps, mp4_fp_timestamps
     else:
         return task_completion, task_data, task_timestamps
@@ -429,8 +431,6 @@ def get_movesense_numbers(token, record_id = None, timepoint = 'orca_4month_arm_
 #-----------------------
 
 #9-----------------------
-record_id = '209'
-timepoint = 'orca_4month_arm_1'
 def check_timestamps(token, record_id, timepoint='orca_4month_arm_1'):
     """
     Pulls task info, and checks to see if there's any incorrectly missing timestamps.
@@ -614,6 +614,30 @@ def get_visit_datetime(token, record_id = None, merged = True, timepoint = 'orca
             data['visit_datetime_8m'] = data['visit_date_8m'] + pd.to_timedelta(data['visit_time_8m'].astype(str))
             data['visit_datetime_8m'] = data['visit_datetime_8m'].dt.tz_localize('America/New_York')
             value = data['visit_datetime_8m'].iloc[0]
+            return value
+        
+    elif timepoint == 'orca_12month_arm_1':
+        visit_notes = get_orca_data(token, form = "visit_notes_12m", form_complete=False, timepoint=timepoint)
+        data = visit_notes[['record_id', 'visit_date_12m', 'visit_time_12m']]
+        data = data[data['visit_date_12m'].notna() | data['visit_time_12m'].notna()]
+
+        data['visit_date_12m'] = pd.to_datetime(data['visit_date_12m'])
+        data['visit_time_12m'] = pd.to_datetime(data['visit_time_12m'], format='%H:%M').dt.time
+
+        if record_id == None and merged == False:
+            return data
+        elif record_id == None and merged == True:
+            data['visit_datetime_12m'] = data['visit_date_12m'] + pd.to_timedelta(data['visit_time_12m'].astype(str))
+            data['visit_datetime_12m'] = data['visit_datetime_12m'].dt.tz_localize('America/New_York')
+            return data
+        elif record_id != None and merged == False:
+            data = data[data['record_id'] == record_id]
+            return data
+        elif record_id != None and merged == True:
+            data = data[data['record_id'] == record_id]
+            data['visit_datetime_12m'] = data['visit_date_12m'] + pd.to_timedelta(data['visit_time_12m'].astype(str))
+            data['visit_datetime_12m'] = data['visit_datetime_12m'].dt.tz_localize('America/New_York')
+            value = data['visit_datetime_12m'].iloc[0]
             return value
 #-----------------------
 
@@ -1211,6 +1235,7 @@ def clean_video_times(file, id, visit_date, timepoint = 4):
     Args:
         file (str): The file path for video times csv
         id (str): the record if you are processing (e.g. '319')
+        visit_date (str): visit date in format '%Y-%m-%d'
         timepoint (int): the numeric value for the timepoint you are processing (default = 4)
     Returns:
         times_data (pandas.DataFrame): Df containing record_id, redcap_event_name, and timestamp for start and end of each video in timepoint
@@ -1218,7 +1243,7 @@ def clean_video_times(file, id, visit_date, timepoint = 4):
     import os
     import pandas as pd
     import pytz
-    from datetime import timedelta
+    from datetime import datetime, timedelta, date as dt
     import numpy as np
     from IPython.display import display
 
@@ -1241,7 +1266,7 @@ def clean_video_times(file, id, visit_date, timepoint = 4):
         times_data['Time'] = times_data['Time'].dt.tz_convert('America/New_York').dt.strftime('%H:%M:%S')
         times_data['Time']
     elif timepoint == 8:
-        times_data['Time'] = pd.to_datetime(times_data['Time']).dt.tz_localize('UTC')
+        times_data['Time'] = pd.to_datetime(visit_date + ' ' + times_data['Time'], utc=True)
 
         #fixing pa_social
         v4_start = times_data['Time'][times_data['Video2'] == 'Video4_Start'].iloc[0]
@@ -1290,21 +1315,83 @@ def clean_video_times(file, id, visit_date, timepoint = 4):
         times_data['Video2'] = times_data['Video2'].str.replace('Video1', 'richards').str.replace('Video2', 'vpc').str.replace('Video3', 'srt').str.replace('Video4', 'pa').str.replace('Video5', 'social').str.replace('Video6', 'relational_memory').str.replace('Video7', 'cecile')
         if fp_order == 1:
             times_data['Video2'] = times_data['Video2'].str.replace('Freeplay_NoBook_Start', 'notoy_start_real_8m').str.replace('Freeplay_Book_Start', 'toy_start_real_8m').str.replace('Freeplay_NoBook_End', 'notoy_end_real_8m').str.replace('Freeplay_Book_End', 'toy_end_real_8m')
-        elif fp_order == 2:
+        elif fp_order == 0:
             times_data['Video2'] = times_data['Video2'].str.replace('Freeplay_NoBook_Start', 'toy_start_real_8m').str.replace('Freeplay_Book_Start', 'notoy_start_real_8m').str.replace('Freeplay_NoBook_End', 'toy_end_real_8m').str.replace('Freeplay_Book_End', 'notoy_end_real_8m')
         
         times_data['Video2'] = times_data['Video2'].str.replace('Start', 'start_8m').str.replace('End', 'end_8m')
 
         times_data['Time'] = times_data['Time'].dt.tz_convert('America/New_York').dt.strftime('%H:%M:%S')
         times_data['Time']
+
+
     elif timepoint == 12:
-        return '12m option not set up for this function just yet!'
+        times_data['Time'] = pd.to_datetime(visit_date + ' ' + times_data['Time'], utc=True)
+
+        #fixing pa_vpc
+        v4_start = times_data['Time'][times_data['Video2'] == 'Video4_Start'].iloc[0]
+        v4_end = times_data['Time'][times_data['Video2'] == 'Video4_End'].iloc[0]
+        v4_exp_max = timedelta(minutes=1, seconds = 25)
+        v4_exp_min = timedelta(minutes=1, seconds=20)
+        v4_dur = v4_end - v4_start
+
+        if v4_dur < v4_exp_min or v4_dur > v4_exp_max:
+            print('duration of video 4 longer or shorter than expected. You may want to check times manually')
+            print(v4_dur)
+
+        pa_start = v4_start
+        pa_end = v4_start + timedelta(minutes=0, seconds=39)
+        vpc_start = v4_start + timedelta(minutes=0, seconds=39)
+        vpc_end = v4_end
+
+        #fixing rel_cec
+        v5_start = times_data['Time'][times_data['Video2'] == 'Video5_Start'].iloc[0]
+        v5_end = times_data['Time'][times_data['Video2'] == 'Video5_End'].iloc[0]
+        v5_exp_max = timedelta(minutes=3, seconds = 3)
+        v5_exp_min = timedelta(minutes=2, seconds=57)
+        v5_dur = v5_end - v5_start
+
+        if v5_dur < v5_exp_min or v5_dur > v5_exp_max:
+            print('duration of video 5 longer or shorter than expected. You may want to check times manually')
+            print(v5_dur)
+        
+        rm_start = v5_start
+        rm_end = v5_start + timedelta(minutes=1, seconds=40)
+        cecile_start = v5_start + timedelta(minutes=1, seconds=40)
+        cecile_end = v5_end
+
+        extra_vid_times = pd.DataFrame({
+            'Video': ['Video4', 'Video4', 'Video5', 'Video5', 'Video6', 'Video6', 'Video7', 'Video7'],
+            'Time': [pa_start, pa_end, vpc_start, vpc_end, rm_start, rm_end, cecile_start, cecile_end],
+            'Video2': ['Video4_Start', 'Video4_End', 'Video5_Start', 'Video5_End', 'Video6_Start', 'Video6_End', 'Video7_Start', 'Video7_End']
+            })
+        
+        times_data = times_data[times_data['Video'] != 'Video5']
+        times_data = times_data[times_data['Video'] != 'Video4']
+        times_data = pd.concat([times_data, extra_vid_times], ignore_index=True)
+
+        #Cleaning 12m Field Names
+        times_data['Video2'] = times_data['Video2'].str.replace('Video1', 'richards').str.replace('Video2', 'gap').str.replace('Video3', 'srt').str.replace('Video4', 'pa').str.replace('Video5', 'vpc').str.replace('Video6', 'relational_memory').str.replace('Video7', 'cecile')
+        if fp_order == 1:
+            times_data['Video2'] = times_data['Video2'].str.replace('Freeplay_NoBook_Start', 'notoy_start_real_12m').str.replace('Freeplay_Book_Start', 'toy_start_real_12m').str.replace('Freeplay_NoBook_End', 'notoy_end_real_12m').str.replace('Freeplay_Book_End', 'toy_end_real_12m')
+        elif fp_order == 0:
+            times_data['Video2'] = times_data['Video2'].str.replace('Freeplay_NoBook_Start', 'toy_start_real_12m').str.replace('Freeplay_Book_Start', 'notoy_start_real_12m').str.replace('Freeplay_NoBook_End', 'toy_end_real_12m').str.replace('Freeplay_Book_End', 'notoy_end_real_12m')
+        
+        times_data['Video2'] = times_data['Video2'].str.replace('Start', 'start_12m').str.replace('End', 'end_12m')
+
+        times_data['Time'] = times_data['Time'].dt.tz_convert('America/New_York').dt.strftime('%H:%M:%S')
+        times_data['Time']
 
     times_data = times_data[['Video2', 'Time']]
     times_data = times_data.set_index('Video2').T
 
     times_data['record_id'] = id
-    times_data['redcap_event_name'] = 'orca_4month_arm_1' if timepoint == 4 else 'orca_8month_arm_1'
+
+    if timepoint == 4:
+        times_data['redcap_event_name'] = 'orca_4month_arm_1'
+    elif timepoint == 8:
+        times_data['redcap_event_name'] = 'orca_8month_arm_1'
+    elif timepoint == 12:
+        times_data['redcap_event_name'] = 'orca_12month_arm_1'
 
     print("\n")
     print('Video times data prepared for redcap import. check before importing')
@@ -1334,7 +1421,7 @@ def clean_survey_data(file, timepoint='4', study='orca'):
     survey_data = pd.read_csv(file)
 
     if study == 'orca':
-        if 'orca' not in survey_data['subject_id'][0]:
+        if 'orca' not in survey_data['subject_id'].iloc[0]:
             survey_data['empty_column'] = ''
             survey_data = survey_data.shift(axis=1)
             survey_data.iloc[:, 0] = survey_data.index
@@ -1530,72 +1617,76 @@ def peach_ema_data_pull(token, data_type=None):
         #next survey in queue
         current_dt = pd.to_datetime('today')
         future_surveys = id_timetable[id_timetable['survey_send_time'] > current_dt].reset_index(drop=True)
-        next_survey_name = future_surveys['survey_name'].iloc[future_surveys['survey_send_time'].idxmin()]
 
-        #% surveys complete / missing data 
-        past_surveys = id_timetable[id_timetable['survey_send_time'] < current_dt].reset_index(drop=True)
-        past_surveys['survey_complete'] = np.nan
+        if future_surveys.empty:
+            print('skipping ', id, ' - finished course of study')
+        else:
+            next_survey_name = future_surveys['survey_name'].iloc[future_surveys['survey_send_time'].idxmin()]
 
-        for i, survey in enumerate(past_surveys['survey_name']):
-            past_surveys.loc[i, 'survey_complete'] = 1 if survey in id_data['ema_survey'].values else 0
+            #% surveys complete / missing data 
+            past_surveys = id_timetable[id_timetable['survey_send_time'] < current_dt].reset_index(drop=True)
+            past_surveys['survey_complete'] = np.nan
 
-        surveys_complete_perc = sum(past_surveys['survey_complete'].values) / len(past_surveys) * 100
-        surveys_missed_perc = (past_surveys['survey_complete'] == 0).sum() / len(past_surveys) * 100
+            for i, survey in enumerate(past_surveys['survey_name']):
+                past_surveys.loc[i, 'survey_complete'] = 1 if survey in id_data['ema_survey'].values else 0
 
-        time_since_last_survey = (current_dt - pd.to_datetime(last_survey_date)).days
+            surveys_complete_perc = sum(past_surveys['survey_complete'].values) / len(past_surveys) * 100
+            surveys_missed_perc = (past_surveys['survey_complete'] == 0).sum() / len(past_surveys) * 100
 
-        #number days enrolled 
-        days_enrolled = (current_dt - id_timetable['survey_send_time'].min()).days
+            time_since_last_survey = (current_dt - pd.to_datetime(last_survey_date)).days
 
-        #Total Averages
-        mean_data_id = pd.DataFrame([{
-            'record_id':id,
-            'anxiety_mean_am': round(id_data['anxiety_am'].mean(), 2),
-            'anxiety_mean_pm': round(id_data['anxiety_pm'].mean(), 2),
-            'attention_mean_am': round(id_data['attention_am'].mean(), 2),
-            'attention_mean_pm': round(id_data['attention_pm'].mean(), 2),
-            'stress_mean_am': round(id_data['stress_am'].mean(), 2),
-            'stress_mean_pm': round(id_data['stress_pm'].mean(), 2),
-            'depression_mean_am': round(id_data['depression_am'].mean(), 2),
-            'depression_mean_pm': round(id_data['depression_pm'].mean(), 2),
-            'loneliness_mean_am': round(id_data['loneliness_am'].mean(), 2),
-        }])
+            #number days enrolled 
+            days_enrolled = (current_dt - id_timetable['survey_send_time'].min()).days
 
-        #Last Scores
-        last_survey_data = id_data[id_data['ema_survey'] == last_survey_name].reset_index(drop=True)
+            #Total Averages
+            mean_data_id = pd.DataFrame([{
+                'record_id':id,
+                'anxiety_mean_am': round(id_data['anxiety_am'].mean(), 2),
+                'anxiety_mean_pm': round(id_data['anxiety_pm'].mean(), 2),
+                'attention_mean_am': round(id_data['attention_am'].mean(), 2),
+                'attention_mean_pm': round(id_data['attention_pm'].mean(), 2),
+                'stress_mean_am': round(id_data['stress_am'].mean(), 2),
+                'stress_mean_pm': round(id_data['stress_pm'].mean(), 2),
+                'depression_mean_am': round(id_data['depression_am'].mean(), 2),
+                'depression_mean_pm': round(id_data['depression_pm'].mean(), 2),
+                'loneliness_mean_am': round(id_data['loneliness_am'].mean(), 2),
+            }])
 
-        last_data_id = pd.DataFrame([{
-            'record_id':id,
-            'last_survey_date': last_survey_date,
-            'last_survey': last_survey_name, 
-            'anxiety_last': last_survey_data['anxiety_' + last_survey_am_pm].iloc[0],
-            'attention_last': last_survey_data['attention_' + last_survey_am_pm].iloc[0],
-            'stress_last': last_survey_data['stress_' + last_survey_am_pm].iloc[0],
-            'depression_last': last_survey_data['depression_' + last_survey_am_pm].iloc[0],
-            'loneliness_last': last_survey_data['loneliness_' + last_survey_am_pm].iloc[0] if last_survey_am_pm == 'am' else np.nan,
-            'comment_last': last_survey_data['ema_comments'].iloc[0]
-        }])
+            #Last Scores
+            last_survey_data = id_data[id_data['ema_survey'] == last_survey_name].reset_index(drop=True)
 
-        #MAX Scores 
-        #survey_info_data 
+            last_data_id = pd.DataFrame([{
+                'record_id':id,
+                'last_survey_date': last_survey_date,
+                'last_survey': last_survey_name, 
+                'anxiety_last': last_survey_data['anxiety_' + last_survey_am_pm].iloc[0],
+                'attention_last': last_survey_data['attention_' + last_survey_am_pm].iloc[0],
+                'stress_last': last_survey_data['stress_' + last_survey_am_pm].iloc[0],
+                'depression_last': last_survey_data['depression_' + last_survey_am_pm].iloc[0],
+                'loneliness_last': last_survey_data['loneliness_' + last_survey_am_pm].iloc[0] if last_survey_am_pm == 'am' else np.nan,
+                'comment_last': last_survey_data['ema_comments'].iloc[0]
+            }])
 
-        survey_info_id = pd.DataFrame([{
-            'record_id': id,
-            'todays_date': current_dt.round('S'),
-            'last_survey': last_survey_name,
-            'last_survey_date': last_survey_date,
-            'next_survey': next_survey_name,
-            'days_enrolled': days_enrolled,
-            'surveys_complete_perc': round(surveys_complete_perc, 2),
-            'missed_surveys_flag': True if time_since_last_survey >= 7 else False
-        }])
+            #MAX Scores 
+            #survey_info_data 
 
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore", FutureWarning)
+            survey_info_id = pd.DataFrame([{
+                'record_id': id,
+                'todays_date': current_dt.round('S'),
+                'last_survey': last_survey_name,
+                'last_survey_date': last_survey_date,
+                'next_survey': next_survey_name,
+                'days_enrolled': days_enrolled,
+                'surveys_complete_perc': round(surveys_complete_perc, 2),
+                'missed_surveys_flag': True if time_since_last_survey >= 7 else False
+            }])
 
-            survey_info = pd.concat([survey_info, survey_info_id], ignore_index=True)
-            mean_data = pd.concat([mean_data, mean_data_id], ignore_index=True)
-            last_data = pd.concat([last_data, last_data_id], ignore_index=True)
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore", FutureWarning)
+
+                survey_info = pd.concat([survey_info, survey_info_id], ignore_index=True)
+                mean_data = pd.concat([mean_data, mean_data_id], ignore_index=True)
+                last_data = pd.concat([last_data, last_data_id], ignore_index=True)
 
     data_map = {
         'survey_info': survey_info,
@@ -1885,12 +1976,13 @@ def calculate_ecg_timestamps_mult_recordings(ecg_data, start_time, end_time, sam
 #-----------------------
 
 #17-----------------------
-def clean_hr_times(file):
+def clean_hr_times(file, visit_date):
     """
     Reads video times csv from OWLET, converts to eastern time and formats into redcap-compatible format for data import
 
     Args:
         file (str): The file path for video times csv
+        visit_date (str): visit date in format '%Y-%m-%d'
     Returns:
         hr_on_start (str): string of start time for hr on video
         hr_off_start (str): string of start time for hr off video
@@ -1907,7 +1999,7 @@ def clean_hr_times(file):
     times_data = times_csv.melt(id_vars=['data:text/csv;charset=utf-8'], var_name='Video', value_name='Time')
     times_data['Video2'] = times_data['Video'] + "_" + times_data.iloc[:, 0]
 
-    times_data['Time'] = pd.to_datetime(times_data['Time']).dt.tz_localize('UTC')
+    times_data['Time'] = pd.to_datetime(visit_date + ' ' + times_data['Time'], utc=True)
 
     times_data['Time'] = times_data['Time'].dt.tz_convert('America/New_York').dt.strftime('%H:%M:%S.%f')
     times_data = times_data[['Video2', 'Time']]
@@ -1917,4 +2009,85 @@ def clean_hr_times(file):
     hr_off_start = times_data['HR_Device_Off_Start'].iloc[0]
 
     return hr_on_start, hr_off_start
+#-----------------------
+
+#18-----------------------
+def overlay_time_ms(video_path,output_path):
+    """
+    Reads an mp4 file, and uses frame rate to overlay time in ms for each frame, and saves it to output path
+
+    Args:
+        video_path (str): The file path for mp4
+        output_path (str): The file path to save the new mp4
+    Returns:
+        Success / error message: Success message if mp4 is successfully saved
+    """
+        
+    import cv2
+    import pandas as pd
+    from datetime import datetime, timedelta
+
+    #Step 1: Try to load video
+    print('loading video...')
+    cap = cv2.VideoCapture(video_path)
+
+    if not cap.isOpened():
+        return "Error: could not open video file. Please check the video path"
+        exit()
+    print('Video file successfully opened')
+
+    # Step 2: Get frame rate
+    print('calculating frame rate...')
+    fps = cap.get(cv2.CAP_PROP_FPS)
+
+    if fps == 0:
+        print('Error: could not calculate frame rate. Process terminated')
+        exit()
+    print(f'Frame rate calculated: {fps:.2f} FPS')
+
+    # Step 3: Initialize output video writer
+    try:
+        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+        width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+        height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
+    except Exception as e:
+        return f"Error: could not initialize the video writer. {e}"
+        exit()
+
+    # Step 4: Process Frames
+    print('processing frame timestamps...')
+    try:
+        while cap.isOpened():
+            ret, frame = cap.read()
+            if not ret:
+                break
+        
+            # Get current frame index
+            frame_index = int(cap.get(cv2.CAP_PROP_POS_FRAMES))
+            
+            # Compute time in milliseconds
+            video_time_ms = int((frame_index / fps) * 1000)
+
+            # Format time as "milliseconds"
+            timestamp_str = f"{video_time_ms} ms"
+
+            # Overlay timestamp on frame
+            cv2.putText(frame, timestamp_str, (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2, cv2.LINE_AA)
+
+            # Write the frame
+            out.write(frame)
+
+    except Exception as e:
+        return f"Error: an error occurred while processing frames. {e}"
+
+    # Step 5: Release resources
+    try:
+        out.release()
+        cap.release()
+        cv2.destroyAllWindows()
+    except Exception as e:
+        return f"Error: Failed to release resources properly. {e}"
+
+    return f"Video processing complete! Saved output to {output_path}"
 #-----------------------

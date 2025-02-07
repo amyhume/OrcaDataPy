@@ -1235,6 +1235,7 @@ def clean_video_times(file, id, visit_date, timepoint = 4):
     Args:
         file (str): The file path for video times csv
         id (str): the record if you are processing (e.g. '319')
+        visit_date (str): visit date in format '%Y-%m-%d'
         timepoint (int): the numeric value for the timepoint you are processing (default = 4)
     Returns:
         times_data (pandas.DataFrame): Df containing record_id, redcap_event_name, and timestamp for start and end of each video in timepoint
@@ -1975,12 +1976,13 @@ def calculate_ecg_timestamps_mult_recordings(ecg_data, start_time, end_time, sam
 #-----------------------
 
 #17-----------------------
-def clean_hr_times(file):
+def clean_hr_times(file, visit_date):
     """
     Reads video times csv from OWLET, converts to eastern time and formats into redcap-compatible format for data import
 
     Args:
         file (str): The file path for video times csv
+        visit_date (str): visit date in format '%Y-%m-%d'
     Returns:
         hr_on_start (str): string of start time for hr on video
         hr_off_start (str): string of start time for hr off video
@@ -1997,7 +1999,7 @@ def clean_hr_times(file):
     times_data = times_csv.melt(id_vars=['data:text/csv;charset=utf-8'], var_name='Video', value_name='Time')
     times_data['Video2'] = times_data['Video'] + "_" + times_data.iloc[:, 0]
 
-    times_data['Time'] = pd.to_datetime(times_data['Time']).dt.tz_localize('UTC')
+    times_data['Time'] = pd.to_datetime(visit_date + ' ' + times_data['Time'], utc=True)
 
     times_data['Time'] = times_data['Time'].dt.tz_convert('America/New_York').dt.strftime('%H:%M:%S.%f')
     times_data = times_data[['Video2', 'Time']]
