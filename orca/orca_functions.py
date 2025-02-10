@@ -1049,7 +1049,12 @@ def extract_task_ibi(token, task):
             #File Info
             who = 'child' if 'child' in file else 'cg'
             id = file.split("_")[0]
-            data = extract_ibi(os.path.join(task_matlab_path, file), method='interpolated')
+
+            try:
+                data = extract_ibi(os.path.join(task_matlab_path, file), method='interpolated')
+            except Exception as e:
+                print('could not extract ibi for ' + file + '\nPlease reprocess in kubios')
+                continue
             
             #finding ecg markers
             ecg_path = os.path.join("/Volumes/ISLAND/Projects/ORCA/ORCA 2.0/Data/4 Months/Heart Rate Data", task, "Raw ECG Data")
