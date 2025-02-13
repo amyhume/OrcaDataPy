@@ -2011,7 +2011,11 @@ def clean_hr_times(file, visit_date):
     times_data = times_data.set_index('Video2').T
 
     hr_on_start = times_data['HR_Device_On_Start'].iloc[0]
-    hr_off_start = times_data['HR_Device_Off_Start'].iloc[0]
+
+    if 'HR_Device_Off_Start' in times_data.columns:
+        hr_off_start = times_data['HR_Device_Off_Start'].iloc[0]
+    else:
+        hr_off_start = None
 
     return hr_on_start, hr_off_start
 #-----------------------
