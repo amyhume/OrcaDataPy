@@ -218,7 +218,6 @@ def get_task_timestamps(token, record_id = None, transposed = False, timepoint =
     
     elif timepoint == 'orca_8month_arm_1':
         visit_notes = get_orca_data(token, form="visit_notes_8m", timepoint=timepoint,form_complete=False)
-        visit_notes = visit_notes[visit_notes['redcap_event_name'] == 'orca_8month_arm_1']
 
         if record_id != None:
             visit_notes = visit_notes[visit_notes['record_id'] == record_id]
@@ -229,6 +228,30 @@ def get_task_timestamps(token, record_id = None, transposed = False, timepoint =
             markers = visit_notes[['richards_start_8m', 'richards_end_8m', 'vpc_start_8m', 'vpc_end_8m','srt_start_8m', 'srt_end_8m', 'pa_start_8m', 'pa_end_8m', 'social_start_8m', 'social_end_8m', 'relational_memory_start_8m', 'relational_memory_end_8m','cecile_start_8m', 'cecile_end_8m', 'notoy_start_real_8m','notoy_end_real_8m', 'toy_start_real_8m', 'toy_end_real_8m']]
         else:
             markers = visit_notes[['record_id','richards_start_8m', 'richards_end_8m', 'vpc_start_8m', 'vpc_end_8m','srt_start_8m', 'srt_end_8m', 'pa_start_8m', 'pa_end_8m','social_start_8m', 'social_end_8m', 'relational_memory_start_8m', 'relational_memory_end_8m','cecile_start_8m', 'cecile_end_8m', 'notoy_start_real_8m','notoy_end_real_8m', 'toy_start_real_8m', 'toy_end_real_8m']]
+        
+        if transposed == True and record_id != None:
+            markers = markers.transpose()
+            markers = markers.rename_axis('marker').reset_index()
+            markers.columns = ['marker', 'timestamp_est']
+            markers['record_id'] = record_id
+            markers['timestamp_est'] = pd.to_datetime(visit_date + ' ' + markers['timestamp_est'])
+            markers = markers[['record_id', 'marker', 'timestamp_est']]
+            markers['timestamp_est'] = markers['timestamp_est'].dt.tz_localize('America/New_York')  
+        elif transposed == True and record_id == None:
+            print('cannot transpose without selecting a record id')
+
+    elif timepoint == 'orca_12month_arm_1':
+        visit_notes = get_orca_data(token, form="visit_notes_12m", timepoint=timepoint,form_complete=False)
+
+        if record_id != None:
+            visit_notes = visit_notes[visit_notes['record_id'] == record_id]
+            visit_notes.reset_index(drop=True, inplace=True)
+            visit_date = str(visit_notes['visit_date_12m'])
+            visit_date = visit_date.split()[1]
+
+            markers = visit_notes[['richards_start_12m', 'richards_end_12m', 'gap_start_12m', 'gap_end_12m','srt_start_12m', 'srt_end_12m', 'pa_start_12m', 'pa_end_12m', 'vpc_start_12m', 'vpc_end_12m', 'relational_memory_start_12m', 'relational_memory_end_12m','cecile_start_12m', 'cecile_end_12m', 'notoy_start_real_12m','notoy_end_real_12m', 'toy_start_real_12m', 'toy_end_real_12m']]
+        else:
+            markers = visit_notes[['record_id','richards_start_12m', 'richards_end_12m', 'gap_start_12m', 'gap_end_12m','srt_start_12m', 'srt_end_12m', 'pa_start_12m', 'pa_end_12m', 'vpc_start_12m', 'vpc_end_12m', 'relational_memory_start_12m', 'relational_memory_end_12m','cecile_start_12m', 'cecile_end_12m', 'notoy_start_real_12m','notoy_end_real_12m', 'toy_start_real_12m', 'toy_end_real_12m']]
         
         if transposed == True and record_id != None:
             markers = markers.transpose()
@@ -289,6 +312,18 @@ def get_task_data(token, record_id = None, transposed = False, timepoint='orca_4
             data_existence1 = visit_notes.loc[:,'richards_ecg_cg_data_8m':'fp_video_data_8m']
             data_existence = pd.concat([record_ids, data_existence1], ignore_index=True)
             data_existence = data_existence.rename(columns={data_existence.columns[0]: 'record_id'})
+    elif timepoint == 'orca_12month_arm_1':
+        visit_notes = get_orca_data(token, form = "visit_notes_12m", form_complete=False, timepoint=timepoint)
+
+        if record_id != None:
+            visit_notes = visit_notes[visit_notes['record_id'] == record_id]
+            visit_notes.reset_index(drop=True, inplace=True)
+            data_existence = visit_notes.loc[:,'richards_ecg_cg_data_12m':'fp_video_data_12m']
+        else:
+            record_ids = visit_notes['record_id']
+            data_existence1 = visit_notes.loc[:,'richards_ecg_cg_data_12m':'fp_video_data_12m']
+            data_existence = pd.concat([record_ids, data_existence1], ignore_index=True)
+            data_existence = data_existence.rename(columns={data_existence.columns[0]: 'record_id'})
 
     if transposed == True and record_id != None:
         data_existence = data_existence.transpose()
@@ -339,6 +374,16 @@ def get_task_completion(token, record_id = None, transposed = False, timepoint='
             whys = visit_notes[['richards_why_8m', 'vpc_why_8m', 'srt_why_8m', 'pa_why_8m', 'social_why_8m', 'relational_memory_why_8m', 'cecile_why_8m', 'freeplay_why_8m']]
         else:
             task_comp = visit_notes[['record_id','richards_comp_8m', 'richards_why_8m','vpc_comp_8m','vpc_why_8m', 'srt_comp_8m', 'srt_why_8m','pa_comp_8m', 'pa_why_8m', 'social_comp_8m', 'social_why_8m', 'relational_memory_comp_8m', 'relational_memory_why_8m','cecile_comp_8m', 'cecile_why_8m','freeplay_comp_8m', 'freeplay_why_8m']]
+    elif timepoint == 'orca_12month_arm_1':
+        visit_notes = get_orca_data(token, form = "visit_notes_12m", form_complete=False, timepoint=timepoint)
+
+        if record_id != None:
+            visit_notes = visit_notes[visit_notes['record_id'] == record_id]
+            visit_notes.reset_index(drop=True, inplace=True)
+            task_comp = visit_notes[['richards_comp_12m','gap_comp_12m', 'srt_comp_12m', 'pa_comp_12m', 'vpc_comp_12m', 'relational_memory_comp_12m', 'cecile_comp_12m', 'freeplay_comp_12m']]
+            whys = visit_notes[['richards_why_12m', 'gap_why_12m', 'srt_why_12m', 'pa_why_12m', 'vpc_why_12m', 'relational_memory_why_12m', 'cecile_why_12m', 'freeplay_why_12m']]
+        else:
+            task_comp = visit_notes[['record_id','richards_comp_12m', 'richards_why_12m','gap_comp_12m','gap_why_12m', 'srt_comp_12m', 'srt_why_12m','pa_comp_12m', 'pa_why_12m', 'vpc_comp_12m', 'vpc_why_12m', 'relational_memory_comp_12m', 'relational_memory_why_12m','cecile_comp_12m', 'cecile_why_12m','freeplay_comp_12m', 'freeplay_why_12m']]
 
     if transposed == True and record_id != None:
         task_comp = task_comp.transpose()
