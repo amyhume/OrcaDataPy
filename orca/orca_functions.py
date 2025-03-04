@@ -412,7 +412,7 @@ def get_movesense_numbers(token, record_id = None, timepoint = 'orca_4month_arm_
     import io
     import numpy as np
 
-    form_name = "visit_notes_" + timepoint[5:7]
+    form_name = "visit_notes_" + timepoint[5:8] if '12' in timepoint else "visit_notes_" + timepoint[5:7]
     visit_notes = get_orca_data(token, form=form_name, form_complete=False, timepoint=timepoint)
     child_column_name = [col for col in visit_notes.columns if 'hr_device_child' in col][0]
     parent_column_name = [col for col in visit_notes.columns if 'hr_device_cg' in col][0]
