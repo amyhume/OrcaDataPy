@@ -2126,7 +2126,8 @@ def check_movesense_version(token, record_id, timepoint='orca_4month_arm_1'):
 
     movesense_version = 1 if package_mailed_date < threshold else 2
 
-    if 'ah' not in who.lower() or 'jv' not in who.lower():
+    if 'ah' not in who.lower() and 'jv' not in who.lower():
         print('The following RA mailed package: ', who, ' - version 1 may have been used!')
+
     return movesense_version
 #-----------------------
