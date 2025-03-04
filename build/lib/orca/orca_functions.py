@@ -1049,7 +1049,12 @@ def extract_task_ibi(token, task):
             #File Info
             who = 'child' if 'child' in file else 'cg'
             id = file.split("_")[0]
-            data = extract_ibi(os.path.join(task_matlab_path, file), method='interpolated')
+
+            try:
+                data = extract_ibi(os.path.join(task_matlab_path, file), method='interpolated')
+            except Exception as e:
+                print('could not extract ibi for ' + file + '\nPlease reprocess in kubios')
+                continue
             
             #finding ecg markers
             ecg_path = os.path.join("/Volumes/ISLAND/Projects/ORCA/ORCA 2.0/Data/4 Months/Heart Rate Data", task, "Raw ECG Data")
@@ -2006,7 +2011,11 @@ def clean_hr_times(file, visit_date):
     times_data = times_data.set_index('Video2').T
 
     hr_on_start = times_data['HR_Device_On_Start'].iloc[0]
-    hr_off_start = times_data['HR_Device_Off_Start'].iloc[0]
+
+    if 'HR_Device_Off_Start' in times_data.columns:
+        hr_off_start = times_data['HR_Device_Off_Start'].iloc[0]
+    else:
+        hr_off_start = None
 
     return hr_on_start, hr_off_start
 #-----------------------
@@ -2090,4 +2099,34 @@ def overlay_time_ms(video_path,output_path):
         return f"Error: Failed to release resources properly. {e}"
 
     return f"Video processing complete! Saved output to {output_path}"
+#-----------------------
+
+#19-----------------------
+def check_movesense_version(token, record_id, timepoint='orca_4month_arm_1'):
+    """
+    Pulls child and caregiver movesense device numbers for a given timepoint.
+    Args:
+        token (str): The API token for the project.
+        record_id (str): the record id you wish to pull (e.g. '218'). Default is 'none' and will pull the whole dataset
+        timepoint (str): the redcap event name of the timepoint you wish to pull. Default is orca_4month_arm_1
+    Returns:
+        movesense_version: 1 if package was mailed < 1/10/25, 2 if after
+    """
+    import requests
+    import pandas as pd
+    import io
+    import numpy as np
+
+    threshold = pd.to_datetime('2025-01-10')
+    package_mailed_date = get_orca_data(token, form='mailing_information_4m', form_complete=False)
+    package_mailed_date = package_mailed_date[(package_mailed_date['record_id'] == record_id) & (package_mailed_date['redcap_event_name'] == timepoint)]
+    who = package_mailed_date['ra_mailed_4m'].iloc[0]
+    package_mailed_date = package_mailed_date['package_mailed_4m'].iloc[0]
+    package_mailed_date = pd.to_datetime(package_mailed_date)
+
+    movesense_version = 1 if package_mailed_date < threshold else 2
+
+    if 'ah' not in who.lower() or 'jv' not in who.lower():
+        print('The following RA mailed package: ', who, ' - version 1 may have been used!')
+    return movesense_version
 #-----------------------

@@ -2118,12 +2118,15 @@ def check_movesense_version(token, record_id, timepoint='orca_4month_arm_1'):
     import numpy as np
 
     threshold = pd.to_datetime('2025-01-10')
-    package_mailed_date = get_orca_field(token, field='package_mailed_4m')
+    package_mailed_date = get_orca_data(token, form='mailing_information_4m', form_complete=False)
     package_mailed_date = package_mailed_date[(package_mailed_date['record_id'] == record_id) & (package_mailed_date['redcap_event_name'] == timepoint)]
+    who = package_mailed_date['ra_mailed_4m'].iloc[0]
     package_mailed_date = package_mailed_date['package_mailed_4m'].iloc[0]
     package_mailed_date = pd.to_datetime(package_mailed_date)
 
     movesense_version = 1 if package_mailed_date < threshold else 2
 
+    if 'ah' not in who.lower() or 'jv' not in who.lower():
+        print('The following RA mailed package: ', who, ' - version 1 may have been used!')
     return movesense_version
 #-----------------------
