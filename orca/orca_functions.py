@@ -2100,3 +2100,30 @@ def overlay_time_ms(video_path,output_path):
 
     return f"Video processing complete! Saved output to {output_path}"
 #-----------------------
+
+#19-----------------------
+def check_movesense_version(token, record_id, timepoint='orca_4month_arm_1'):
+    """
+    Pulls child and caregiver movesense device numbers for a given timepoint.
+    Args:
+        token (str): The API token for the project.
+        record_id (str): the record id you wish to pull (e.g. '218'). Default is 'none' and will pull the whole dataset
+        timepoint (str): the redcap event name of the timepoint you wish to pull. Default is orca_4month_arm_1
+    Returns:
+        movesense_version: 1 if package was mailed < 1/10/25, 2 if after
+    """
+    import requests
+    import pandas as pd
+    import io
+    import numpy as np
+
+    threshold = pd.to_datetime('2025-01-10')
+    package_mailed_date = get_orca_field(token, field='package_mailed_4m')
+    package_mailed_date = package_mailed_date[(package_mailed_date['record_id'] == record_id) & (package_mailed_date['redcap_event_name'] == timepoint)]
+    package_mailed_date = package_mailed_date['package_mailed_4m'].iloc[0]
+    package_mailed_date = pd.to_datetime(package_mailed_date)
+
+    movesense_version = 1 if package_mailed_date < threshold else 2
+
+    return movesense_version
+#-----------------------
