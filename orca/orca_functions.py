@@ -515,7 +515,8 @@ def get_movesense_times(token, record_id, who, timepoint='orca_4month_arm_1'):
     import numpy as np
     import pytz
 
-    form_name = "visit_notes_" + timepoint[5:7]
+    timepoint_pre = timepoint[5:8] if '12' in timepoint else timepoint[5:7]
+    form_name = "visit_notes_" + timepoint_pre
     visit_notes = get_orca_data(token, form=form_name, form_complete=False, timepoint=timepoint)
     child_on = [col for col in visit_notes.columns if 'child_movesense_on' in col][0]
     child_off = [col for col in visit_notes.columns if 'child_movesense_off' in col][0]
@@ -525,10 +526,10 @@ def get_movesense_times(token, record_id, who, timepoint='orca_4month_arm_1'):
     movesense_times = visit_notes[['record_id', parent_on,child_on, parent_off, child_off]]
     movesense_times = movesense_times[movesense_times['record_id'] == record_id].reset_index(drop=True)
 
-    date = get_orca_field(token, field = "visit_date_"+timepoint[5:7])
+    date = get_orca_field(token, field = "visit_date_"+timepoint_pre)
     date = date[date['record_id'] == record_id]
     date = date[date['redcap_event_name'] == timepoint]
-    date = str(date["visit_date_"+timepoint[5:7]])
+    date = str(date["visit_date_"+timepoint_pre])
     date = date.split()[1]
 
     if who == 'cg':
