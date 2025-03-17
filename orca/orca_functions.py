@@ -1235,7 +1235,13 @@ def extract_task_ibi(token, task):
                 elif who == 'child':
                     task_import_child = import_file if task_import_child.empty else task_import_child.merge(import_file, how = 'outer')
                 
-        task_import = task_import_cg.merge(task_import_child, on=['record_id', 'redcap_event_name'], how="outer")
+        if not task_import_cg.empty and not task_import_child.empty:
+            task_import = task_import_cg.merge(task_import_child, on=['record_id', 'redcap_event_name'], how="outer")
+        elif not task_import_cg.empty and task_import_child.empty:
+            task_import = task_import_cg
+        elif task_import_cg.empty and not task_import_child.empty:
+            task_import = task_import_child
+            
         return temp_log, task_import
     else:
         print('batch ibi extraction terminated')
