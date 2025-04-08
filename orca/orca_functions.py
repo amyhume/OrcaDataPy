@@ -1095,7 +1095,6 @@ def extract_task_ibi(token, task, timepoint = '4', method='interpolated'):
 
     if response == 'y' and len(files) >= 1:
         for file in files:
-            print(file)
             #File Info
             who = 'child' if 'child' in file else 'cg'
             id = file.split("_")[0]
@@ -1183,6 +1182,7 @@ def extract_task_ibi(token, task, timepoint = '4', method='interpolated'):
                         'ibi_sd': np.nanstd(data['ibi_ms']),
                         'max_ibi': np.nanmax(data['ibi_ms']),
                         'min_ibi': np.nanmin(data['ibi_ms']),
+                        'perc_noise': data['ibi_ms'].isna().sum() / len(data) * 100,
                         'check_file_order': np.nan,
                         'resegment_mult_rec': np.na
                     }])
@@ -1208,7 +1208,7 @@ def extract_task_ibi(token, task, timepoint = '4', method='interpolated'):
                 elif task.lower() == 'freeplay':
                     nt_data = data[data['condition'] == 'notoy']
                     t_data = data[data['condition'] == 'toy']
-
+            
                     temp_data = pd.DataFrame([{
                         'record_id': id,
                         'who': who,
@@ -1217,14 +1217,17 @@ def extract_task_ibi(token, task, timepoint = '4', method='interpolated'):
                         'ibi_sd': np.nanstd(data['ibi_ms']),
                         'max_ibi': np.nanmax(data['ibi_ms']),
                         'min_ibi': np.nanmin(data['ibi_ms']),
+                        'perc_noise': data['ibi_ms'].isna().sum() / len(data) * 100,
                         'ibi_mean_nt': np.nanmean(nt_data['ibi_ms']) if not nt_data.empty else np.nan,
                         'ibi_sd_nt': np.nanstd(nt_data['ibi_ms']) if not nt_data.empty else np.nan,
                         'max_ibi_nt': np.nanmax(nt_data['ibi_ms']) if not nt_data.empty else np.nan,
                         'min_ibi_nt': np.nanmin(nt_data['ibi_ms']) if not nt_data.empty else np.nan,
+                        'perc_noise_nt': nt_data['ibi_ms'].isna().sum() / len(nt_data) * 100,
                         'ibi_mean_t': np.nanmean(t_data['ibi_ms']) if not t_data.empty else np.nan,
                         'ibi_sd_t': np.nanstd(t_data['ibi_ms']) if not t_data.empty else np.nan,
                         'max_ibi_t': np.nanmax(t_data['ibi_ms']) if not t_data.empty else np.nan,
                         'min_ibi_t': np.nanmin(t_data['ibi_ms']) if not t_data.empty else np.nan,
+                        'perc_noise_t': t_data['ibi_ms'].isna().sum() / len(t_data) * 100,
                         'check_file_order': np.nan,
                         'resegment_mult_rec': np.nan
                     }])
@@ -1261,14 +1264,17 @@ def extract_task_ibi(token, task, timepoint = '4', method='interpolated'):
                             'ibi_sd': np.nan,
                             'max_ibi': np.nan,
                             'min_ibi': np.nan,
+                            'perc_noise': np.nan,
                             'ibi_mean_nt': np.nan,
                             'ibi_sd_nt': np.nan,
                             'max_ibi_nt': np.nan,
                             'min_ibi_nt': np.nan,
+                            'perc_noise_nt': np.nan,
                             'ibi_mean_t': np.nan,
                             'ibi_sd_t': np.nan,
                             'max_ibi_t': np.nan,
                             'min_ibi_t': np.nan,
+                            'perc_noise_t': np.nan,
                             'check_file_order': np.nan,
                             'resegment_mult_rec': '1'
                         }])
