@@ -1064,13 +1064,15 @@ def extract_ibi(file,method='interpolated'):
 #-----------------------
 
 #8-----------------------
-def extract_task_ibi(token, task):
+def extract_task_ibi(token, task, timepoint = '4', method='interpolated'):
     """
     Batch processes IBI matlab files for a given task
 
     Args:
         task (str): The task you want to process: 'Richards', 'VPC', 'SRT', 'Cecile', 'Relational Memory', 'Freeplay'
         token (str): The API token for the project.
+        timepoint(str): Timepoint you wish to process as a string. Default is 4
+        method (str): whether to pull raw or interpolated IBIs. Default is interpolated
     Returns:
         temp_log (pandas.DataFrame): A logbook of each file processed and the mean / sd ibi values 
         task_import (pandas.DataFrame): The same info as temp_log but in wide format and with columns renamed for redcap import
@@ -1081,8 +1083,9 @@ def extract_task_ibi(token, task):
     import numpy as np
     from datetime import date as dt
     #pulling task matlab files
-    task_matlab_path = os.path.join("/Volumes/ISLAND/Projects/ORCA/ORCA 2.0/Data/4 Months/Heart Rate Data", task, "Beat Corrected Matlab Files")
+    task_matlab_path = os.path.join("/Volumes/ISLAND/Projects/ORCA/ORCA 2.0/Data", timepoint + ' Months', "Heart Rate Data", task, "Beat Corrected Matlab Files")
     files = [file for file in os.listdir(task_matlab_path) if 'processed' not in file and '.DS_Store' not in file and '.mat' in file]
+
     
     print("\n", "The following ", task, " files will be processed:", "\n", "\n", files)
     response = input("\n"+'Continue to process (y/n):')
@@ -1092,148 +1095,197 @@ def extract_task_ibi(token, task):
 
     if response == 'y' and len(files) >= 1:
         for file in files:
+            print(file)
             #File Info
             who = 'child' if 'child' in file else 'cg'
             id = file.split("_")[0]
 
             try:
-                data = extract_ibi(os.path.join(task_matlab_path, file), method='interpolated')
+                data = extract_ibi(os.path.join(task_matlab_path, file), method=method)
             except Exception as e:
                 print('could not extract ibi for ' + file + '\nPlease reprocess in kubios')
                 continue
             
             #finding ecg markers
-            ecg_path = os.path.join("/Volumes/ISLAND/Projects/ORCA/ORCA 2.0/Data/4 Months/Heart Rate Data", task, "Raw ECG Data")
+            ecg_path = os.path.join("/Volumes/ISLAND/Projects/ORCA/ORCA 2.0/Data", timepoint + ' Months', "Heart Rate Data", task, "Raw ECG Data")
             ecg_file = [ecg_file for ecg_file in os.listdir(ecg_path) if id in ecg_file and "_"+who in ecg_file][0]
             ecg_data = pd.read_csv(os.path.join(ecg_path, ecg_file))
 
-            ecg_data = (ecg_data
-                        .loc[:, ['marker', 'timestamp_relative']]
-                        .dropna(subset=['marker'])
-                        .reset_index(drop=True))
+            recording_n = list(set(ecg_data['recording_id'])) if 'recording_id' in ecg_data.columns else [1]
 
-            closest_timestamps = []
-            for index in ecg_data.index:
-                closest_timestamp = find_closest_timestamp(ecg_data.iloc[index, 1], data['time_s'], type='numeric')
-                closest_timestamps.append(closest_timestamp)
-
-            ecg_data['time_s'] = closest_timestamps
-            ecg_data = ecg_data[['time_s', 'marker']]
-            data = pd.merge(data,ecg_data, on='time_s', how='left')
-
-            #adding continuous conditions column to the ibi_file
-            markers = data[pd.notna(data['marker'])].reset_index(drop=True)
-            markers = markers[['time_s', 'marker']]
-            markers['condition'] = markers['marker'].str.split('_').str[0]
-
-            condition_list = []
-
-            for i, time in enumerate(data['time_s']):
-                for i2, marker_time in enumerate(markers['time_s']):
-                    if i2 != (markers.index.stop-1):
-                        if time >= marker_time and time < markers['time_s'][i2+1]:
-                            condition = markers['condition'][i2]
-                            break
-                        else:
-                            condition = np.nan
-                    else:
-                        if time >= marker_time:
-                            condition = markers['condition'][i2]
-                            break
-                        else:
-                            condition = np.nan
+            if len(recording_n) == 1:
+                ecg_data = (ecg_data
+                            .loc[:, ['marker', 'timestamp_relative']]
+                            .dropna(subset=['marker'])
+                            .reset_index(drop=True))
                 
-                condition_list.append(condition)
+
+                closest_timestamps = []
+                for index in ecg_data.index:
+                    closest_timestamp = find_closest_timestamp(ecg_data.iloc[index, 1], data['time_s'], type='numeric')
+                    
+                    if closest_timestamp in closest_timestamps:
+                        available_times = [t for t in data['time_s'] if t not in closest_timestamps and t >= ecg_data.iloc[index, 1]]
+                        closest_timestamp = find_closest_timestamp(ecg_data.iloc[index, 1], available_times, type='numeric')
+                    
+                    closest_timestamps.append(closest_timestamp)
+
+                ecg_data['time_s'] = closest_timestamps
+                ecg_data = ecg_data[['time_s', 'marker']]
+                data = pd.merge(data,ecg_data, on='time_s', how='left')
 
 
-            data['condition'] = condition_list
+                #adding continuous conditions column to the ibi_file
+                markers = data[pd.notna(data['marker'])].reset_index(drop=True)
+                markers = markers[['time_s', 'marker']]
+                markers['condition'] = markers['marker'].str.split('_').str[0]
 
-            #saving IBI csv
-            ibi_path = os.path.join("/Volumes/ISLAND/Projects/ORCA/ORCA 2.0/Data/4 Months/Heart Rate Data", task, "IBI Files")
-            ibi_file_name = id+"_4m_" + who + "_ibi_" + task.lower() + ".csv" 
-            data.to_csv(os.path.join(ibi_path, ibi_file_name), index=False)
+                condition_list = []
 
-            #renaming original matlab file
-            old_matlab = os.path.join(task_matlab_path, file)
-            new_matlab = os.path.join(task_matlab_path, id+"_4m_"+who+"_ecg_"+task.lower()+"_hrv_processed.mat")
-            os.rename(old_matlab, new_matlab)
-            print('extracted ibi and saved csv for ', file)
+                for i, time in enumerate(data['time_s']):
+                    for i2, marker_time in enumerate(markers['time_s']):
+                        if i2 != (markers.index.stop-1):
+                            if time >= marker_time and time < markers['time_s'][i2+1]:
+                                condition = markers['condition'][i2]
+                                break
+                            else:
+                                condition = np.nan
+                        else:
+                            if time >= marker_time:
+                                condition = markers['condition'][i2]
+                                break
+                            else:
+                                condition = np.nan
+                    
+                    condition_list.append(condition)
 
-            #Calculating Descriptives
 
-            if task.lower() != 'freeplay':
-                temp_data = pd.DataFrame([{
-                    'record_id': id,
-                    'who': who,
-                    'date': dt.today(),
-                    'ibi_mean': np.nanmean(data['ibi_ms']),
-                    'ibi_sd': np.nanstd(data['ibi_ms']),
-                    'max_ibi': np.nanmax(data['ibi_ms']),
-                    'min_ibi': np.nanmin(data['ibi_ms'])
-                }])
+                data['condition'] = condition_list
+                #saving IBI csv
+                ibi_path = os.path.join("/Volumes/ISLAND/Projects/ORCA/ORCA 2.0/Data", timepoint + ' Months',"Heart Rate Data", task, "IBI Files")
+                ibi_file_name = id+"_" + timepoint + "m_" + who + "_ibi_" + task.lower() + ".csv" 
+                data.to_csv(os.path.join(ibi_path, ibi_file_name), index=False)
 
-                temp_log = temp_data if temp_log.empty else temp_log.merge(temp_data, how='outer')
+                #renaming original matlab file
+                old_matlab = os.path.join(task_matlab_path, file)
+                new_matlab = os.path.join(task_matlab_path, id+"_" + timepoint + "m_"+who+"_ecg_"+task.lower()+"_hrv_processed.mat")
+                os.rename(old_matlab, new_matlab)
+                print('extracted ibi and saved csv for ', file)
 
-                #creating import file
-                import_file = temp_data[['record_id', 'date', 'ibi_mean', 'ibi_sd']]
-                import_file = import_file.copy()
-                import_file.rename(columns={
-                    'date': who + "_" + task.lower() + "_ibi_date_4m", 
-                    'ibi_mean': who + "_" + task.lower() + "_ibi_m_4m", 
-                    'ibi_sd': who + "_" + task.lower() + "_ibi_sd_4m"}, inplace=True)
-                import_file['redcap_event_name'] = 'orca_4month_arm_1'
+                #Calculating Descriptives
 
-                import_file[who + "_" + task.lower() + "_ibi_date_4m"] =import_file[who + "_" + task.lower() + "_ibi_date_4m"].astype(str)
+                if task.lower() != 'freeplay':
+                    temp_data = pd.DataFrame([{
+                        'record_id': id,
+                        'who': who,
+                        'date': dt.today(),
+                        'ibi_mean': np.nanmean(data['ibi_ms']),
+                        'ibi_sd': np.nanstd(data['ibi_ms']),
+                        'max_ibi': np.nanmax(data['ibi_ms']),
+                        'min_ibi': np.nanmin(data['ibi_ms']),
+                        'check_file_order': np.nan,
+                        'resegment_mult_rec': np.na
+                    }])
 
-                if who == 'cg':
-                    task_import_cg = import_file if task_import_cg.empty else task_import_cg.merge(import_file, how = 'outer')
-                elif who == 'child':
-                    task_import_child = import_file if task_import_child.empty else task_import_child.merge(import_file, how = 'outer')
+                    temp_log = pd.concat([temp_log, temp_data], ignore_index=True)
 
-            elif task.lower() == 'freeplay':
-                nt_data = data[data['condition'] == 'notoy']
-                t_data = data[data['condition'] == 'toy']
+                    #creating import file
+                    import_file = temp_data[['record_id', 'date', 'ibi_mean', 'ibi_sd']]
+                    import_file = import_file.copy()
+                    import_file.rename(columns={
+                        'date': who + "_" + task.lower() + "_ibi_date_" + timepoint + 'm', 
+                        'ibi_mean': who + "_" + task.lower() + "_ibi_m_" + timepoint + 'm', 
+                        'ibi_sd': who + "_" + task.lower() + "_ibi_sd_" + timepoint + 'm'}, inplace=True)
+                    import_file['redcap_event_name'] = 'orca_' + timepoint + 'month_arm_1'
 
-                temp_data = pd.DataFrame([{
-                    'record_id': id,
-                    'who': who,
-                    'date': dt.today(),
-                    'ibi_mean': np.nanmean(data['ibi_ms']),
-                    'ibi_sd': np.nanstd(data['ibi_ms']),
-                    'max_ibi': np.nanmax(data['ibi_ms']),
-                    'min_ibi': np.nanmin(data['ibi_ms']),
-                    'ibi_mean_nt': np.nanmean(nt_data['ibi_ms']) if not nt_data.empty else np.nan,
-                    'ibi_sd_nt': np.nanstd(nt_data['ibi_ms']) if not nt_data.empty else np.nan,
-                    'max_ibi_nt': np.nanmax(nt_data['ibi_ms']) if not nt_data.empty else np.nan,
-                    'min_ibi_nt': np.nanmin(nt_data['ibi_ms']) if not nt_data.empty else np.nan,
-                    'ibi_mean_t': np.nanmean(t_data['ibi_ms']) if not t_data.empty else np.nan,
-                    'ibi_sd_t': np.nanstd(t_data['ibi_ms']) if not t_data.empty else np.nan,
-                    'max_ibi_t': np.nanmax(t_data['ibi_ms']) if not t_data.empty else np.nan,
-                    'min_ibi_t': np.nanmin(t_data['ibi_ms']) if not t_data.empty else np.nan,
-                }])
+                    import_file[who + "_" + task.lower() + "_ibi_date_" + timepoint + 'm'] = import_file[who + "_" + task.lower() + "_ibi_date_" + timepoint + 'm'].astype(str)
 
-                temp_log = temp_data if temp_log.empty else temp_log.merge(temp_data, how='outer')
+                    if who == 'cg':
+                        task_import_cg = import_file if task_import_cg.empty else task_import_cg.merge(import_file, how = 'outer')
+                    elif who == 'child':
+                        task_import_child = import_file if task_import_child.empty else task_import_child.merge(import_file, how = 'outer')
 
-                #creating import file
-                import_file = temp_data[['record_id', 'date', 'ibi_mean', 'ibi_sd', 'ibi_mean_nt', 'ibi_sd_nt', 'ibi_mean_t', 'ibi_sd_t']]
-                import_file = import_file.copy()
-                import_file.rename(columns={
-                    'date': who + "_" + task.lower() + "_ibi_date_4m", 
-                    'ibi_mean': who + "_" + task.lower() + "_ibi_m_4m", 
-                    'ibi_sd': who + "_" + task.lower() + "_ibi_sd_4m",  
-                    'ibi_mean_nt': who + "_notoy_ibi_m_4m", 
-                    'ibi_sd_nt': who +"_notoy_ibi_sd_4m", 
-                    'ibi_mean_t': who + "_toy_ibi_m_4m", 
-                    'ibi_sd_t': who +"_toy_ibi_sd_4m"}, 
-                    inplace=True)
+                elif task.lower() == 'freeplay':
+                    nt_data = data[data['condition'] == 'notoy']
+                    t_data = data[data['condition'] == 'toy']
+
+                    temp_data = pd.DataFrame([{
+                        'record_id': id,
+                        'who': who,
+                        'date': dt.today(),
+                        'ibi_mean': np.nanmean(data['ibi_ms']),
+                        'ibi_sd': np.nanstd(data['ibi_ms']),
+                        'max_ibi': np.nanmax(data['ibi_ms']),
+                        'min_ibi': np.nanmin(data['ibi_ms']),
+                        'ibi_mean_nt': np.nanmean(nt_data['ibi_ms']) if not nt_data.empty else np.nan,
+                        'ibi_sd_nt': np.nanstd(nt_data['ibi_ms']) if not nt_data.empty else np.nan,
+                        'max_ibi_nt': np.nanmax(nt_data['ibi_ms']) if not nt_data.empty else np.nan,
+                        'min_ibi_nt': np.nanmin(nt_data['ibi_ms']) if not nt_data.empty else np.nan,
+                        'ibi_mean_t': np.nanmean(t_data['ibi_ms']) if not t_data.empty else np.nan,
+                        'ibi_sd_t': np.nanstd(t_data['ibi_ms']) if not t_data.empty else np.nan,
+                        'max_ibi_t': np.nanmax(t_data['ibi_ms']) if not t_data.empty else np.nan,
+                        'min_ibi_t': np.nanmin(t_data['ibi_ms']) if not t_data.empty else np.nan,
+                        'check_file_order': np.nan,
+                        'resegment_mult_rec': np.nan
+                    }])
+
+                    temp_log = pd.concat([temp_log, temp_data], ignore_index=True)
+
+                    #creating import file
+                    import_file = temp_data[['record_id', 'date', 'ibi_mean', 'ibi_sd', 'ibi_mean_nt', 'ibi_sd_nt', 'ibi_mean_t', 'ibi_sd_t']]
+                    import_file = import_file.copy()
+                    import_file.rename(columns={
+                        'date': who + "_" + task.lower() + "_ibi_date_" + timepoint + 'm', 
+                        'ibi_mean': who + "_" + task.lower() + "_ibi_m_" + timepoint + 'm', 
+                        'ibi_sd': who + "_" + task.lower() + "_ibi_sd_" + timepoint + 'm',  
+                        'ibi_mean_nt': who + "_notoy_ibi_m_" + timepoint + 'm', 
+                        'ibi_sd_nt': who +"_notoy_ibi_sd_" + timepoint + 'm', 
+                        'ibi_mean_t': who + "_toy_ibi_m_" + timepoint + 'm', 
+                        'ibi_sd_t': who +"_toy_ibi_sd_" + timepoint + 'm'}, 
+                        inplace=True)
+                    
+                    import_file['redcap_event_name'] = 'orca_' + timepoint + 'month_arm_1'
+                    import_file[who + "_" + task.lower() + "_ibi_date_" +timepoint + 'm'] =import_file[who + "_" + task.lower() + "_ibi_date_" + timepoint + 'm'].astype(str)
+
+                    if who == 'cg':
+                        task_import_cg = import_file if task_import_cg.empty else task_import_cg.merge(import_file, how = 'outer')
+                    elif who == 'child':
+                        task_import_child = import_file if task_import_child.empty else task_import_child.merge(import_file, how = 'outer')
+            else:
+                if task == 'Freeplay':
+                    temp_data = pd.DataFrame([{
+                            'record_id': id,
+                            'who': who,
+                            'date': dt.today(),
+                            'ibi_mean': np.nan,
+                            'ibi_sd': np.nan,
+                            'max_ibi': np.nan,
+                            'min_ibi': np.nan,
+                            'ibi_mean_nt': np.nan,
+                            'ibi_sd_nt': np.nan,
+                            'max_ibi_nt': np.nan,
+                            'min_ibi_nt': np.nan,
+                            'ibi_mean_t': np.nan,
+                            'ibi_sd_t': np.nan,
+                            'max_ibi_t': np.nan,
+                            'min_ibi_t': np.nan,
+                            'check_file_order': np.nan,
+                            'resegment_mult_rec': '1'
+                        }])
+                else:
+                    temp_data = pd.DataFrame([{
+                            'record_id': id,
+                            'who': who,
+                            'date': dt.today(),
+                            'ibi_mean': np.nan,
+                            'ibi_sd': np.nan,
+                            'max_ibi': np.nan,
+                            'min_ibi': np.nan,
+                            'check_file_order': np.nan,
+                            'resegment_mult_rec': '1'
+                        }])
                 
-                import_file['redcap_event_name'] = 'orca_4month_arm_1'
-                import_file[who + "_" + task.lower() + "_ibi_date_4m"] =import_file[who + "_" + task.lower() + "_ibi_date_4m"].astype(str)
-
-                if who == 'cg':
-                    task_import_cg = import_file if task_import_cg.empty else task_import_cg.merge(import_file, how = 'outer')
-                elif who == 'child':
-                    task_import_child = import_file if task_import_child.empty else task_import_child.merge(import_file, how = 'outer')
+                temp_log = pd.concat([temp_log, temp_data], ignore_index=True)
                 
         if not task_import_cg.empty and not task_import_child.empty:
             task_import = task_import_cg.merge(task_import_child, on=['record_id', 'redcap_event_name'], how="outer")
@@ -1241,7 +1293,27 @@ def extract_task_ibi(token, task):
             task_import = task_import_cg
         elif task_import_cg.empty and not task_import_child.empty:
             task_import = task_import_child
-            
+
+        #checking cg / child ibi values 
+        flagged_ids = []
+
+        temp_log['check_file_order'] = np.nan
+        for id in list(set(temp_log['record_id'])):
+            id_data = temp_log[temp_log['record_id'] == id]
+            if len(id_data) == 2 and 'cg' in id_data['who'].values and 'child' in id_data['who'].values:
+                cg_ibi = id_data[id_data['who'] == 'cg']['ibi_mean'].iloc[0]
+                child_ibi = id_data[id_data['who'] == 'child']['ibi_mean'].iloc[0]
+
+                flag = '1' if child_ibi > cg_ibi else np.nan
+                if flag == '1':
+                    flagged_ids.append(id)
+
+                    temp_log.loc[temp_log['record_id'] == id, 'check_file_order'] = '1'
+
+        mult_rec = [temp_log['record_id'].iloc[i] for i, value in enumerate(temp_log['resegment_mult_rec']) if value == '1']
+        
+        print('The following IDs have a child IBI larger than cg. Check that the files are not switched: ', '\n', flagged_ids)
+        print('The following IDs have multiple recordings and need to be resegmented accordingly: ', '\n', mult_rec)
         return temp_log, task_import
     else:
         print('batch ibi extraction terminated')
