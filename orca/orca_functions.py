@@ -1116,7 +1116,17 @@ def extract_task_ibi(token, task, timepoint = '4', method='interpolated'):
                         .loc[:, ['marker', 'timestamp_relative']]
                         .dropna(subset=['marker'])
                         .reset_index(drop=True))
-            
+
+            if ecg_data['marker'].iloc[0] == 'notoy_start_real_12m':
+                ecg_data = ecg_data.sort_values(
+                    by='marker',
+                    key=lambda x: ~x.str.contains('^notoy', regex=True)
+                ).reset_index(drop=True)
+            elif ecg_data['marker'].iloc[0] == 'toy_start_real_12m':
+                ecg_data = ecg_data.sort_values(
+                    by='marker',
+                    key=lambda x: ~x.str.contains('^toy', regex=True)
+                ).reset_index(drop=True)
 
             closest_timestamps = []
             for index in ecg_data.index:
