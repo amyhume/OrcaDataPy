@@ -1117,12 +1117,12 @@ def extract_task_ibi(token, task, timepoint = '4', method='interpolated'):
                         .dropna(subset=['marker'])
                         .reset_index(drop=True))
 
-            if ecg_data['marker'].iloc[0] == 'notoy_start_real_12m':
+            if 'notoy_start_real' in ecg_data['marker'].iloc[0]:
                 ecg_data = ecg_data.sort_values(
                     by='marker',
                     key=lambda x: ~x.str.contains('^notoy', regex=True)
                 ).reset_index(drop=True)
-            elif ecg_data['marker'].iloc[0] == 'toy_start_real_12m':
+            elif 'toy_start_real' in ecg_data['marker'].iloc[0]:
                 ecg_data = ecg_data.sort_values(
                     by='marker',
                     key=lambda x: ~x.str.contains('^toy', regex=True)
