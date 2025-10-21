@@ -1426,6 +1426,9 @@ def clean_video_times(file, id, visit_date, timepoint = 4):
         
         times_data['Video2'] = times_data['Video2'].str.replace('Start', 'start_8m').str.replace('End', 'end_8m')
 
+        if not pd.api.types.is_datetime64_any_dtype(times_data['Time']):
+            times_data['Time'] = pd.to_datetime(times_data['Time'], utc=True, errors='coerce')
+
         times_data['Time'] = times_data['Time'].dt.tz_convert('America/New_York').dt.strftime('%H:%M:%S')
         times_data['Time']
 
@@ -1483,7 +1486,8 @@ def clean_video_times(file, id, visit_date, timepoint = 4):
             times_data['Video2'] = times_data['Video2'].str.replace('Freeplay_NoBook_Start', 'toy_start_real_12m').str.replace('Freeplay_Book_Start', 'notoy_start_real_12m').str.replace('Freeplay_NoBook_End', 'toy_end_real_12m').str.replace('Freeplay_Book_End', 'notoy_end_real_12m')
         
         times_data['Video2'] = times_data['Video2'].str.replace('Start', 'start_12m').str.replace('End', 'end_12m')
-
+        if not pd.api.types.is_datetime64_any_dtype(times_data['Time']):
+            times_data['Time'] = pd.to_datetime(times_data['Time'], utc=True, errors='coerce')
         times_data['Time'] = times_data['Time'].dt.tz_convert('America/New_York').dt.strftime('%H:%M:%S')
         times_data['Time']
 
