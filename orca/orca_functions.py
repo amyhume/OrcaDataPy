@@ -457,7 +457,11 @@ def get_movesense_numbers(token, record_id = None, timepoint = 'orca_4month_arm_
     import io
     import numpy as np
 
-    form_name = "visit_notes_" + timepoint[5:8] if '12' in timepoint else "visit_notes_" + timepoint[5:7]
+    if 'orca' in timepoint or 'mice_8month' in timepoint or 'mice_12month' in timepoint:
+        form_name = "visit_notes_" + timepoint[5:8] if '12' in timepoint else "visit_notes_" + timepoint[5:7]
+    elif 'mice_4month' in timepoint:
+        form_name = 'mice_visit_notes_4m'
+
     visit_notes = get_orca_data(token, form=form_name, form_complete=False, timepoint=timepoint)
     child_column_name = [col for col in visit_notes.columns if 'hr_device_child' in col][0]
     parent_column_name = [col for col in visit_notes.columns if 'hr_device_cg' in col][0]
@@ -614,6 +618,7 @@ def get_visit_datetime(token, record_id = None, merged = True, timepoint = 'orca
     from datetime import datetime
     import pytz
 
+
     if timepoint == 'orca_4month_arm_1':
         visit_notes = get_orca_data(token, form = "visit_notes_4m", form_complete=False, timepoint=timepoint)
         data = visit_notes[['record_id', 'visit_date_4m', 'visit_time_4m']]
@@ -638,7 +643,7 @@ def get_visit_datetime(token, record_id = None, merged = True, timepoint = 'orca
             value = data['visit_datetime_4m'].iloc[0]
             return value
         
-    elif timepoint == 'orca_8month_arm_1':
+    elif timepoint == 'orca_8month_arm_1' or timepoint == 'mice_8month_arm_4':
         visit_notes = get_orca_data(token, form = "visit_notes_8m", form_complete=False, timepoint=timepoint)
         data = visit_notes[['record_id', 'visit_date_8m', 'visit_time_8m']]
         data = data[data['visit_date_8m'].notna() | data['visit_time_8m'].notna()]
@@ -662,7 +667,7 @@ def get_visit_datetime(token, record_id = None, merged = True, timepoint = 'orca
             value = data['visit_datetime_8m'].iloc[0]
             return value
         
-    elif timepoint == 'orca_12month_arm_1':
+    elif timepoint == 'orca_12month_arm_1' or timepoint == 'mice_12month_arm_4':
         visit_notes = get_orca_data(token, form = "visit_notes_12m", form_complete=False, timepoint=timepoint)
         data = visit_notes[['record_id', 'visit_date_12m', 'visit_time_12m']]
         data = data[data['visit_date_12m'].notna() | data['visit_time_12m'].notna()]
@@ -685,6 +690,31 @@ def get_visit_datetime(token, record_id = None, merged = True, timepoint = 'orca
             data['visit_datetime_12m'] = data['visit_datetime_12m'].dt.tz_localize('America/New_York')
             value = data['visit_datetime_12m'].iloc[0]
             return value
+    
+    elif timepoint == 'mice_4month_arm_4':
+        visit_notes = get_orca_data(token, form = "mice_visit_notes_4m", form_complete=False, timepoint=timepoint)
+        data = visit_notes[['record_id', 'mc_visit_date_4m', 'mc_visit_time_4m']]
+        data = data[data['mc_visit_date_4m'].notna() | data['mc_visit_time_4m'].notna()]
+
+        data['mc_visit_date_4m'] = pd.to_datetime(data['mc_visit_date_4m'])
+        data['mc_visit_time_4m'] = pd.to_datetime(data['mc_visit_time_4m'], format='%H:%M').dt.time
+
+        if record_id == None and merged == False:
+            return data
+        elif record_id == None and merged == True:
+            data['mc_visit_datetime_4m'] = data['mc_visit_date_4m'] + pd.to_timedelta(data['mc_visit_time_4m'].astype(str))
+            data['mc_visit_datetime_4m'] = data['mc_visit_datetime_4m'].dt.tz_localize('America/New_York')
+            return data
+        elif record_id != None and merged == False:
+            data = data[data['record_id'] == record_id]
+            return data
+        elif record_id != None and merged == True:
+            data = data[data['record_id'] == record_id]
+            data['mc_visit_datetime_4m'] = data['mc_visit_date_4m'] + pd.to_timedelta(data['mc_visit_time_4m'].astype(str))
+            data['mc_visit_datetime_4m'] = data['mc_visit_datetime_4m'].dt.tz_localize('America/New_York')
+            value = data['mc_visit_datetime_4m'].iloc[0]
+            return value
+
 #-----------------------
 
 #12-----------------------
@@ -1334,7 +1364,7 @@ def create_epochs(data, size=3, time_column = 'time_s', value_column='ibi_ms', c
 #OWLET SPECIFIC FUNCTIONS
 
 #9-----------------------
-def clean_video_times(file, id, visit_date, timepoint = 4):
+def clean_video_times(file, id, visit_date, timepoint = 4, study='orca'):
     """
     Reads video times csv from OWLET, converts to eastern time and formats into redcap-compatible format for data import
 
@@ -1364,13 +1394,23 @@ def clean_video_times(file, id, visit_date, timepoint = 4):
     fp_order = 1 if visit_date2 < fp_order2_date else 0
 
     if timepoint == 4:
-        #renaming to redcap field names
-        times_data['Video2'] = times_data['Video2'].str.replace('Video1', 'richards').str.replace('Video2', 'vpc').str.replace('Video3', 'srt').str.replace('Video4', 'cecile').str.replace('Video5', 'relational_memory')
-        times_data['Video2'] = times_data['Video2'].str.replace('Start', 'start_4m').str.replace('End', 'end_4m')
+        if study == 'orca':
+            #renaming to redcap field names
+            times_data['Video2'] = times_data['Video2'].str.replace('Video1', 'richards').str.replace('Video2', 'vpc').str.replace('Video3', 'srt').str.replace('Video4', 'cecile').str.replace('Video5', 'relational_memory')
+            times_data['Video2'] = times_data['Video2'].str.replace('Start', 'start_4m').str.replace('End', 'end_4m')
 
-        times_data['Time'] = pd.to_datetime(visit_date + ' ' + times_data['Time'], utc=True)
-        times_data['Time'] = times_data['Time'].dt.tz_convert('America/New_York').dt.strftime('%H:%M:%S')
-        times_data['Time']
+            times_data['Time'] = pd.to_datetime(visit_date + ' ' + times_data['Time'], utc=True)
+            times_data['Time'] = times_data['Time'].dt.tz_convert('America/New_York').dt.strftime('%H:%M:%S')
+            times_data['Time']
+        elif study == 'mice':
+            #renaming to redcap field names
+            times_data['Video2'] = times_data['Video2'].str.replace('Video1', 'mc_richards').str.replace('Video2', 'mc_srt').str.replace('Video3', 'mc_cecile').str.replace('Video4', 'mc_relational_memory').str.replace('Video5', 'mc_vpc')
+            times_data['Video2'] = times_data['Video2'].str.replace('Start', 'start_4m').str.replace('End', 'end_4m')
+
+            times_data['Time'] = pd.to_datetime(visit_date + ' ' + times_data['Time'], utc=True)
+            times_data['Time'] = times_data['Time'].dt.tz_convert('America/New_York').dt.strftime('%H:%M:%S')
+            times_data['Time']
+
     elif timepoint == 8:
         times_data['Time'] = pd.to_datetime(visit_date + ' ' + times_data['Time'], utc=True)
 
@@ -1497,11 +1537,11 @@ def clean_video_times(file, id, visit_date, timepoint = 4):
     times_data['record_id'] = id
 
     if timepoint == 4:
-        times_data['redcap_event_name'] = 'orca_4month_arm_1'
+        times_data['redcap_event_name'] = 'orca_4month_arm_1' if study == 'orca' else 'mice_4month_arm_4'
     elif timepoint == 8:
-        times_data['redcap_event_name'] = 'orca_8month_arm_1'
+        times_data['redcap_event_name'] = 'orca_8month_arm_1' if study == 'orca' else 'mice_4month_arm_4'
     elif timepoint == 12:
-        times_data['redcap_event_name'] = 'orca_12month_arm_1'
+        times_data['redcap_event_name'] = 'orca_12month_arm_1' if study == 'orca' else 'mice_4month_arm_4'
 
     print("\n")
     print('Video times data prepared for redcap import. check before importing')
