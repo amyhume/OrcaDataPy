@@ -1158,15 +1158,19 @@ def extract_task_ibi(token, task, timepoint = '4', method='interpolated'):
                     key=lambda x: ~x.str.contains('^toy', regex=True)
                 ).reset_index(drop=True)
 
-            closest_timestamps = []
-            for index in ecg_data.index:
-                closest_timestamp = find_closest_timestamp(ecg_data.iloc[index, 1], data['time_s'], type='numeric')
-                
-                if closest_timestamp in closest_timestamps:
-                    available_times = [t for t in data['time_s'] if t not in closest_timestamps and t >= ecg_data.iloc[index, 1]]
-                    closest_timestamp = find_closest_timestamp(ecg_data.iloc[index, 1], available_times, type='numeric')
-                
-                closest_timestamps.append(closest_timestamp)
+            try:
+                closest_timestamps = []
+                for index in ecg_data.index:
+                    closest_timestamp = find_closest_timestamp(ecg_data.iloc[index, 1], data['time_s'], type='numeric')
+                    
+                    if closest_timestamp in closest_timestamps:
+                        available_times = [t for t in data['time_s'] if t not in closest_timestamps and t >= ecg_data.iloc[index, 1]]
+                        closest_timestamp = find_closest_timestamp(ecg_data.iloc[index, 1], available_times, type='numeric')
+                    
+                    closest_timestamps.append(closest_timestamp)
+            except Exception as e:
+                print(f"Couldn't reconcile timestamps for {file}, skipping...")
+                continue
 
             ecg_data['time_s'] = closest_timestamps
             ecg_data = ecg_data[['time_s', 'marker']]
