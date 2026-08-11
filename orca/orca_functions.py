@@ -1114,9 +1114,10 @@ def extract_task_ibi(token, task, timepoint = '4', method='interpolated'):
     from datetime import date as dt
     #pulling task matlab files
     #TEMP CODE FOR MAGGIE
-    local_path = "/Users/maggiezhang/Desktop"
+    local_path = "/Users/maggiezhang/Desktop/HR Data"
     
-    task_matlab_path = os.path.join("/Volumes/ISLAND/Projects/ORCA/ORCA 2.0/Data", timepoint + ' Months', "Heart Rate Data", task, "Beat Corrected Matlab Files")
+    #task_matlab_path = os.path.join("/Volumes/ISLAND/Projects/ORCA/ORCA 2.0/Data", timepoint + ' Months', "Heart Rate Data", task, "Beat Corrected Matlab Files")
+    task_matlab_path = f"{local_path}/{timepoint} Months/Beat Corrected Matlab Files"
     files = [file for file in os.listdir(task_matlab_path) if 'processed' not in file and '.DS_Store' not in file and '.mat' in file]
 
     
@@ -1210,7 +1211,7 @@ def extract_task_ibi(token, task, timepoint = '4', method='interpolated'):
             #ibi_path = os.path.join("/Volumes/ISLAND/Projects/ORCA/ORCA 2.0/Data", timepoint + ' Months',"Heart Rate Data", task, "IBI Files")
             
             #temp
-            ibi_path = f"{local_path}/HR Processing/{timepoint} Months/{task}/IBI Files"
+            ibi_path = f"{local_path}/{timepoint} Months/IBI Files"
             os.makedirs(ibi_path, exist_ok=True)
             ###
             
