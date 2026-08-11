@@ -1113,6 +1113,9 @@ def extract_task_ibi(token, task, timepoint = '4', method='interpolated'):
     import numpy as np
     from datetime import date as dt
     #pulling task matlab files
+    #TEMP CODE FOR MAGGIE
+    local_path = "/Users/maggiezhang/Desktop"
+    
     task_matlab_path = os.path.join("/Volumes/ISLAND/Projects/ORCA/ORCA 2.0/Data", timepoint + ' Months', "Heart Rate Data", task, "Beat Corrected Matlab Files")
     files = [file for file in os.listdir(task_matlab_path) if 'processed' not in file and '.DS_Store' not in file and '.mat' in file]
 
@@ -1204,14 +1207,20 @@ def extract_task_ibi(token, task, timepoint = '4', method='interpolated'):
 
             data['condition'] = condition_list
             #saving IBI csv
-            ibi_path = os.path.join("/Volumes/ISLAND/Projects/ORCA/ORCA 2.0/Data", timepoint + ' Months',"Heart Rate Data", task, "IBI Files")
+            #ibi_path = os.path.join("/Volumes/ISLAND/Projects/ORCA/ORCA 2.0/Data", timepoint + ' Months',"Heart Rate Data", task, "IBI Files")
+            
+            #temp
+            ibi_path = f"{local_path}/HR Processing/{timepoint} Months/{task}/IBI Files"
+            os.makedirs(ibi_path, exist_ok=True)
+            ###
+            
             ibi_file_name = id+"_" + timepoint + "m_" + who + "_ibi_" + task.lower() + ".csv" 
             data.to_csv(os.path.join(ibi_path, ibi_file_name), index=False)
 
             #renaming original matlab file
             old_matlab = os.path.join(task_matlab_path, file)
             new_matlab = os.path.join(task_matlab_path, id+"_" + timepoint + "m_"+who+"_ecg_"+task.lower()+"_hrv_processed.mat")
-            os.rename(old_matlab, new_matlab)
+            #os.rename(old_matlab, new_matlab)
             print('extracted ibi and saved csv for ', file)
 
             #Calculating Descriptives
